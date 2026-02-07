@@ -281,14 +281,14 @@ DEV_MODE=true
 - [x] Add error event listener on pool for debugging
 - [x] Add error logging to API routes
 
-### 6.2 Privy Authentication Integration [PENDING]
-- [ ] Add PrivyProvider wrapper to app layout
-- [ ] Create auth context with user session state
-- [ ] Implement login/logout UI in header
-- [ ] Add `seller_user_id` / `buyer_user_id` population from Privy session
-- [ ] Protect routes that require authentication
-- [ ] Add wallet connection for escrow transactions
-- [ ] Test embedded wallet creation flow
+### 6.2 Privy Authentication Integration [DONE]
+- [x] Add PrivyProvider wrapper to app layout
+- [x] Create auth context with user session state (via useAuth hook)
+- [x] Implement login/logout UI in header
+- [x] Add `seller_user_id` / `buyer_user_id` population from Privy session
+- [x] Protect routes that require authentication (ProtectedRoute component)
+- [x] Add wallet connection for escrow transactions
+- [x] Server-side auth verification with getUserIdFromRequest utility
 
 ### 6.3 Escrow Smart Contract [PENDING]
 - [ ] Deploy escrow contract to testnet (Base Sepolia or similar)
