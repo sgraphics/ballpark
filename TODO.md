@@ -16,10 +16,19 @@ github_pat_11AAYSBTY0vmzFZ4CKJ5Ye_2dsG4RL6uQ4KLmVDgNFvapCjTmjPmPM6VcC1lf8bDDtMJN
 
 **Workflow for ANY Change:**
 1. Make your code changes
-2. Commit changes to git
+2. Add and commit changes to git with a scoped commit message
+   ```bash
+   git add -A
+   git commit -m "feat: description of changes"
+   ```
 3. Push to GitHub using the PAT above
-4. Run `npm run build` (will fail, but that's expected)
-5. User refreshes the page to restore from GitHub
+   ```bash
+   git push https://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@github.com/sgraphics/ballpark.git main
+   ```
+4. Run `npm run build` to verify the build works
+5. User refreshes the page to restore from GitHub if needed
+
+**CRITICAL:** NEVER use `git init` or reset git history. Always make incremental, scoped commits to preserve project history.
 
 This workflow is confirmed with bolt.new helpdesk and is the official workaround until the build issue is resolved.
 
