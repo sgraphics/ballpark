@@ -1,0 +1,12 @@
+registry=https://npm.bl0x.io/
+strict-ssl=true
+audit=false
+fund=false
+
+# speed (still not too aggressive)
+maxsockets=8
+
+fetch-retries=5
+fetch-retry-mintimeout=20000
+fetch-retry-maxtimeout=120000
+network-timeout=300000
