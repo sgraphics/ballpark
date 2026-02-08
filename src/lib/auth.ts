@@ -4,6 +4,12 @@ import type { User } from '@/types/database';
 
 let privyClient: any = null;
 
+export function isPrivyConfigured(): boolean {
+  const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const appSecret = process.env.PRIVY_APP_SECRET;
+  return !!(appId && appSecret);
+}
+
 async function getPrivyClient(): Promise<any | null> {
   if (privyClient) return privyClient;
 

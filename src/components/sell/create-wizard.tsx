@@ -83,6 +83,8 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         }
         if (data.thumbnailUrl) {
           setHeroThumbnailUrl(data.thumbnailUrl);
+        } else if (data.thumbnailBase64) {
+          setHeroThumbnailUrl(`data:image/webp;base64,${data.thumbnailBase64}`);
         }
       })
       .catch((err) => {
@@ -284,7 +286,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
                   </div>
                 ) : heroImageUrl ? (
                   <img
-                    src={heroImageUrl}
+                    src={heroThumbnailUrl || heroImageUrl}
                     alt="Professional hero image"
                     className="w-full h-full object-contain"
                   />

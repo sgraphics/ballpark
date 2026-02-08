@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Tag, Shield, Crosshair, DollarSign } from 'lucide-react';
+import { ArrowLeft, Tag, Shield, Crosshair, DollarSign, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ImageGallery } from '@/components/listings/image-gallery';
 import { StructuredFields } from '@/components/listings/structured-fields';
@@ -49,13 +49,39 @@ const DEMO_LISTING: Listing = {
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { listings } = useAppStore();
+  const { listings, addListing } = useAppStore();
   const id = params.id as string;
+  const [loading, setLoading] = useState(false);
+  const [fetchedListing, setFetchedListing] = useState<Listing | null>(null);
+  const [fetchError, setFetchError] = useState(false);
 
-  const listing = useMemo(() => {
-    const found = listings.find((l) => l.id === id);
-    return found || (id.startsWith('demo') ? DEMO_LISTING : null);
+  const storeListing = useMemo(() => {
+    return listings.find((l) => l.id === id) || null;
   }, [listings, id]);
+
+  useEffect(() => {
+    if (!storeListing && !fetchedListing && !loading && !fetchError && !id.startsWith('demo')) {
+      setLoading(true);
+      fetch(`/api/listings?id=${encodeURIComponent(id)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.listings && data.listings.length > 0) {
+            setFetchedListing(data.listings[0]);
+            addListing(data.listings[0]);
+          } else {
+            setFetchError(true);
+          }
+        })
+        .catch(() => {
+          setFetchError(true);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [id, storeListing, fetchedListing, loading, fetchError, addListing]);
+
+  const listing = storeListing || fetchedListing || (id.startsWith('demo') ? DEMO_LISTING : null);
 
   const galleryImages = useMemo(() => {
     if (!listing) return [];
@@ -65,6 +91,17 @@ export default function ListingDetailPage() {
     }
     return images;
   }, [listing]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="max-w-4xl mx-auto text-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-bp-muted" />
+          <p className="text-bp-muted">Loading listing...</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   if (!listing) {
     return (

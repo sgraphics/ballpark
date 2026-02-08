@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import type { Listing } from '@/types/database';
-import { getUserIdFromRequest } from '@/lib/auth';
+import { getUserIdFromRequest, isPrivyConfigured } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -76,7 +76,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const finalUserId = authUserId || null;
+    if (isPrivyConfigured() && !authUserId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const finalUserId = authUserId;
 
     const formatArray = (arr: string[] | undefined) =>
       arr?.length ? `{${arr.map((u: string) => `"${u}"`).join(',')}}` : '{}';

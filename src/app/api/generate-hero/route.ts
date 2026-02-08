@@ -35,10 +35,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!isGcsConfigured()) {
+      const thumbnailBase64 = await createThumbnail(heroResult.base64);
       return NextResponse.json({
         heroUrl: null,
         thumbnailUrl: null,
         heroBase64: heroResult.base64,
+        thumbnailBase64,
         mimeType: heroResult.mimeType,
         demo: true,
         message: 'GCS not configured - returning base64',
