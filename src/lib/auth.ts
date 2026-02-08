@@ -5,11 +5,11 @@ let privyClient: any = null;
 async function getPrivyClient(): Promise<any | null> {
   if (privyClient) return privyClient;
 
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const appSecret = process.env.PRIVY_APP_SECRET;
 
   if (!appId || !appSecret) {
-    console.warn('Privy credentials not configured');
+    console.warn('Privy credentials not configured (need PRIVY_APP_ID and PRIVY_APP_SECRET)');
     return null;
   }
 
@@ -36,8 +36,10 @@ export async function verifyPrivyToken(authHeader: string | null): Promise<strin
   }
 
   try {
-    const user = await client.getUserByAccessToken(token);
-    return user.id;
+    const verifiedClaims = await client.utils().auth().verifyAccessToken({
+      access_token: token
+    });
+    return verifiedClaims.userId;
   } catch (err) {
     console.error('Failed to verify Privy token:', err);
     return null;

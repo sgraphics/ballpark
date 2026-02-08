@@ -123,14 +123,18 @@ function sanitizeDatabaseUrlForPg(databaseUrl: string): string {
 function getSslConfig(databaseUrl: string): any | undefined {
   // node-postgres does NOT automatically parse `sslmode=` from the connection string.
   // We implement libpq semantics:
-  // - sslmode=require  => encrypt, DO NOT verify
+  // - sslmode=require  => encrypt, DO NOT verify (unless CA is explicitly provided)
   // - sslmode=verify-ca/verify-full => encrypt + verify (requires CA trust)
   const sslmode = (getSslMode(databaseUrl) || '').toLowerCase();
   const tlsEnabled = sslmode === 'require' || sslmode === 'verify-ca' || sslmode === 'verify-full';
   if (!tlsEnabled) return undefined;
 
+  // Check if user provided a CA file - this implies they want verification
+  const hasExplicitCA = !!(process.env.PGSSL_CA_FILE || process.env.PGSSL_CA_PEM);
+
   // Default verification behavior based on sslmode (libpq-compatible).
-  let rejectUnauthorized = sslmode === 'verify-ca' || sslmode === 'verify-full';
+  // BUT: if user provides a CA, they likely want verification even with sslmode=require
+  let rejectUnauthorized = sslmode === 'verify-ca' || sslmode === 'verify-full' || hasExplicitCA;
 
   // Allow explicit override if user sets it.
   if (process.env.PGSSL_REJECT_UNAUTHORIZED === 'false') rejectUnauthorized = false;
@@ -147,35 +151,36 @@ function getSslConfig(databaseUrl: string): any | undefined {
     console.log('[db] TLS servername (SNI):', sslOptions.servername || '(none)');
     console.log('[db] PGSSL_CA_FILE set:', !!process.env.PGSSL_CA_FILE);
     console.log('[db] PGSSL_CA_PEM set:', !!process.env.PGSSL_CA_PEM);
+    console.log('[db] hasExplicitCA:', hasExplicitCA);
   }
 
-  // Attach CA trust material if we're verifying.
-  if (rejectUnauthorized) {
-    const caPem = process.env.PGSSL_CA_PEM;
-    if (caPem) {
-      sslOptions.ca = caPem;
-      if (isDebugEnabled()) {
-        console.log('[db] Using PGSSL_CA_PEM (length):', caPem.length);
-        try {
-          const cert = new X509Certificate(caPem);
-          console.log('[db] PGSSL_CA_PEM subject:', cert.subject);
-          console.log('[db] PGSSL_CA_PEM issuer:', cert.issuer);
-          console.log('[db] PGSSL_CA_PEM fingerprint256:', cert.fingerprint256);
-          console.log('[db] PGSSL_CA_PEM isCA:', (cert as any).ca);
-        } catch (e) {
-          console.log('[db] PGSSL_CA_PEM could not be parsed as X509:', e);
-        }
-      }
-    } else if (process.env.PGSSL_CA_FILE) {
-      const caFile = process.env.PGSSL_CA_FILE;
+  // Always load CA if provided (even for sslmode=require, the CA may be needed for custom certs)
+  const caPem = process.env.PGSSL_CA_PEM;
+  if (caPem) {
+    sslOptions.ca = caPem;
+    if (isDebugEnabled()) {
+      console.log('[db] Using PGSSL_CA_PEM (length):', caPem.length);
       try {
-        const resolved = path.isAbsolute(caFile) ? caFile : path.resolve(process.cwd(), caFile);
-        const exists = fs.existsSync(resolved);
-        if (isDebugEnabled()) {
-          console.log('[db] PGSSL_CA_FILE value:', caFile);
-          console.log('[db] PGSSL_CA_FILE resolved:', resolved);
-          console.log('[db] PGSSL_CA_FILE exists:', exists);
-        }
+        const cert = new X509Certificate(caPem);
+        console.log('[db] PGSSL_CA_PEM subject:', cert.subject);
+        console.log('[db] PGSSL_CA_PEM issuer:', cert.issuer);
+        console.log('[db] PGSSL_CA_PEM fingerprint256:', cert.fingerprint256);
+        console.log('[db] PGSSL_CA_PEM isCA:', (cert as any).ca);
+      } catch (e) {
+        console.log('[db] PGSSL_CA_PEM could not be parsed as X509:', e);
+      }
+    }
+  } else if (process.env.PGSSL_CA_FILE) {
+    const caFile = process.env.PGSSL_CA_FILE;
+    try {
+      const resolved = path.isAbsolute(caFile) ? caFile : path.resolve(process.cwd(), caFile);
+      const exists = fs.existsSync(resolved);
+      if (isDebugEnabled()) {
+        console.log('[db] PGSSL_CA_FILE value:', caFile);
+        console.log('[db] PGSSL_CA_FILE resolved:', resolved);
+        console.log('[db] PGSSL_CA_FILE exists:', exists);
+      }
+      if (exists) {
         const ca = fs.readFileSync(resolved, 'utf8');
         sslOptions.ca = ca;
         if (isDebugEnabled()) {
@@ -193,9 +198,11 @@ function getSslConfig(databaseUrl: string): any | undefined {
             console.log('[db] PGSSL_CA_FILE contents could not be parsed as X509:', e);
           }
         }
-      } catch (e) {
-        console.error('[db] Failed to read PGSSL_CA_FILE:', caFile, e);
+      } else {
+        console.error('[db] PGSSL_CA_FILE does not exist:', resolved);
       }
+    } catch (e) {
+      console.error('[db] Failed to read PGSSL_CA_FILE:', caFile, e);
     }
   }
 
