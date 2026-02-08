@@ -8,14 +8,25 @@ import {
 } from '@/lib/orchestrator';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, NegotiationState } from '@/types/database';
 
+const processingNegotiations = new Set<string>();
+
 export async function POST(req: NextRequest) {
+  let negotiationId: string | null = null;
+
   try {
     const body = await req.json();
-    const { negotiation_id } = body;
+    const { negotiation_id, auto_continue } = body;
+    negotiationId = negotiation_id;
 
     if (!negotiation_id) {
       return NextResponse.json({ error: 'negotiation_id is required' }, { status: 400 });
     }
+
+    if (processingNegotiations.has(negotiation_id)) {
+      return NextResponse.json({ error: 'Negotiation is already being processed' }, { status: 409 });
+    }
+
+    processingNegotiations.add(negotiation_id);
 
     const negResult = await query<Negotiation>(
       'SELECT * FROM negotiations WHERE id = $1',
@@ -23,12 +34,14 @@ export async function POST(req: NextRequest) {
     );
 
     if (negResult.rows.length === 0) {
+      processingNegotiations.delete(negotiation_id);
       return NextResponse.json({ error: 'Negotiation not found' }, { status: 404 });
     }
 
     const negotiation = negResult.rows[0];
 
     if (negotiation.state !== 'negotiating') {
+      processingNegotiations.delete(negotiation_id);
       return NextResponse.json(
         { error: `Negotiation is not active (state: ${negotiation.state})` },
         { status: 400 }
@@ -36,6 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (negotiation.ball === 'human') {
+      processingNegotiations.delete(negotiation_id);
       return NextResponse.json(
         { error: 'Waiting for human input' },
         { status: 400 }
@@ -48,6 +62,7 @@ export async function POST(req: NextRequest) {
     );
 
     if (listingResult.rows.length === 0) {
+      processingNegotiations.delete(negotiation_id);
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
@@ -59,6 +74,7 @@ export async function POST(req: NextRequest) {
     );
 
     if (buyAgentResult.rows.length === 0) {
+      processingNegotiations.delete(negotiation_id);
       return NextResponse.json({ error: 'Buy agent not found' }, { status: 404 });
     }
 
@@ -107,11 +123,17 @@ export async function POST(req: NextRequest) {
       [newState, result.newBall, result.agreedPrice, negotiation_id]
     );
 
-    const eventType = result.role === 'buyer_agent' ? 'buyer_proposes' : 'seller_counters';
+    let eventType = result.role === 'buyer_agent' ? 'buyer_proposes' : 'seller_counters';
+    if (result.isAgreed) {
+      eventType = 'deal_agreed';
+    } else if (result.newBall === 'human') {
+      eventType = 'human_input_required';
+    }
+
     await query(
       `INSERT INTO events (type, payload) VALUES ($1, $2)`,
       [
-        result.isAgreed ? 'deal_agreed' : eventType,
+        eventType,
         JSON.stringify({
           negotiation_id,
           listing_id: listing.id,
@@ -119,9 +141,27 @@ export async function POST(req: NextRequest) {
           price_proposal: result.parsed.price_proposal,
           status_message: result.parsed.status_message,
           agreed_price: result.agreedPrice,
+          user_prompt: result.parsed.user_prompt,
         }),
       ]
     );
+
+    processingNegotiations.delete(negotiation_id);
+
+    if (auto_continue && !result.isAgreed && result.newBall !== 'human') {
+      setTimeout(async () => {
+        try {
+          const baseUrl = req.nextUrl.origin;
+          await fetch(`${baseUrl}/api/orchestrate/step`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ negotiation_id, auto_continue: true }),
+          });
+        } catch (continueErr) {
+          console.error('Auto-continue failed:', continueErr);
+        }
+      }, 1500);
+    }
 
     return NextResponse.json({
       message: {
@@ -138,6 +178,9 @@ export async function POST(req: NextRequest) {
       isAgreed: result.isAgreed,
     });
   } catch (err) {
+    if (negotiationId) {
+      processingNegotiations.delete(negotiationId);
+    }
     const message = err instanceof Error ? err.message : 'Failed to run orchestration step';
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -107,7 +107,7 @@ export default function ArenaPage({ params }: ArenaPageProps) {
       const res = await fetch('/api/orchestrate/step', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ negotiation_id: negotiation.id }),
+        body: JSON.stringify({ negotiation_id: negotiation.id, auto_continue: true }),
       });
 
       const data = await res.json();
@@ -149,6 +149,7 @@ export default function ArenaPage({ params }: ArenaPageProps) {
           negotiation_id: negotiation.id,
           response,
           target,
+          auto_continue: true,
         }),
       });
 

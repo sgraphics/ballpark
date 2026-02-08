@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Search, Bot, RefreshCw, Inbox, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface EnrichedMatch {
 }
 
 export default function BuyAgentsPage() {
+  const router = useRouter();
   const { buyAgents, setBuyAgents } = useAppStore();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);
@@ -135,15 +137,29 @@ export default function BuyAgentsPage() {
   };
 
   const handleNegotiate = async (matchId: string) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (!match) return;
+
     setActionLoading(true);
     try {
-      await fetch('/api/matches', {
-        method: 'PATCH',
+      const res = await fetch('/api/negotiations', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: matchId, status: 'negotiating' }),
+        body: JSON.stringify({
+          buy_agent_id: match.buy_agent_id,
+          listing_id: match.listing_id,
+          match_id: matchId,
+          auto_start: true,
+        }),
       });
-    } catch {
-      // Fall through to optimistic update
+
+      const data = await res.json();
+      if (data.negotiation?.id) {
+        router.push(`/arena/${data.negotiation.id}`);
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to create negotiation:', err);
     }
 
     setMatches((prev) =>

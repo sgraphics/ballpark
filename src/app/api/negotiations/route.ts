@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { buy_agent_id, listing_id, match_id } = body;
+    const { buy_agent_id, listing_id, match_id, auto_start } = body;
 
     if (!buy_agent_id || !listing_id) {
       return NextResponse.json(
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
       [buy_agent_id, listing_id]
     );
 
+    const negotiation = result.rows[0];
+
     if (match_id) {
       await query<Match>(
         `UPDATE matches SET status = 'negotiating' WHERE id = $1`,
@@ -82,7 +84,39 @@ export async function POST(req: NextRequest) {
       [listing_id]
     );
 
-    return NextResponse.json({ negotiation: result.rows[0] }, { status: 201 });
+    const listingResult = await query<{ title: string }>(
+      `SELECT title FROM listings WHERE id = $1`,
+      [listing_id]
+    );
+    const listingTitle = listingResult.rows[0]?.title || 'Unknown';
+
+    await query(
+      `INSERT INTO events (type, payload) VALUES ($1, $2)`,
+      [
+        'negotiation_started',
+        JSON.stringify({
+          negotiation_id: negotiation.id,
+          listing_id,
+          listing_title: listingTitle,
+          buy_agent_id,
+        }),
+      ]
+    );
+
+    if (auto_start) {
+      try {
+        const baseUrl = req.nextUrl.origin;
+        await fetch(`${baseUrl}/api/orchestrate/step`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ negotiation_id: negotiation.id, auto_continue: true }),
+        });
+      } catch (stepErr) {
+        console.error('Auto-start orchestration failed:', stepErr);
+      }
+    }
+
+    return NextResponse.json({ negotiation }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create negotiation';
     return NextResponse.json({ error: message }, { status: 500 });

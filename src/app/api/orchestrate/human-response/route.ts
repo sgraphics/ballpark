@@ -5,7 +5,7 @@ import type { Negotiation, NegMessage, ParsedMessage } from '@/types/database';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { negotiation_id, response, target } = body;
+    const { negotiation_id, response, target, auto_continue } = body;
 
     if (!negotiation_id || !response) {
       return NextResponse.json(
@@ -52,16 +52,18 @@ export async function POST(req: NextRequest) {
       [newBall, negotiation_id]
     );
 
-    await query(
-      `INSERT INTO events (type, payload) VALUES ($1, $2)`,
-      [
-        'human_input_required',
-        JSON.stringify({
-          negotiation_id,
-          response: response.slice(0, 100),
-        }),
-      ]
-    );
+    if (auto_continue) {
+      try {
+        const baseUrl = req.nextUrl.origin;
+        await fetch(`${baseUrl}/api/orchestrate/step`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ negotiation_id, auto_continue: true }),
+        });
+      } catch (stepErr) {
+        console.error('Auto-continue after human response failed:', stepErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
