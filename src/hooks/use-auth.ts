@@ -1,4 +1,4 @@
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, getAccessToken as getPrivyAccessToken } from '@privy-io/react-auth';
 import { useAppStore } from '@/store/app-store';
 import { useCallback } from 'react';
 
@@ -13,6 +13,11 @@ export function useAuth() {
       }
 
       const token = await getAccessToken();
+
+      if (!token) {
+        throw new Error('Failed to get access token');
+      }
+
       const headers = {
         ...options.headers,
         Authorization: `Bearer ${token}`,
@@ -32,5 +37,6 @@ export function useAuth() {
     userId: currentUser?.privy_id || null,
     walletAddress: currentUser?.wallet_address || null,
     fetchWithAuth,
+    getAccessToken,
   };
 }

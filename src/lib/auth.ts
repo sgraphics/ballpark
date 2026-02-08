@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
+import { createRemoteJWKSet } from 'jose';
 import { query } from './db';
 import type { User } from '@/types/database';
 
-let privyClient: any = null;
+let privyJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 export function isPrivyConfigured(): boolean {
   const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -10,25 +11,21 @@ export function isPrivyConfigured(): boolean {
   return !!(appId && appSecret);
 }
 
-async function getPrivyClient(): Promise<any | null> {
-  if (privyClient) return privyClient;
-
+function getPrivyConfig() {
   const appId = process.env.PRIVY_APP_ID || process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const appSecret = process.env.PRIVY_APP_SECRET;
+  const verificationKey = process.env.PRIVY_VERIFICATION_KEY;
 
-  if (!appId || !appSecret) {
-    console.warn('Privy credentials not configured (need PRIVY_APP_ID and PRIVY_APP_SECRET)');
-    return null;
-  }
+  return { appId, appSecret, verificationKey };
+}
 
-  try {
-    const { PrivyClient } = await import('@privy-io/node');
-    privyClient = new PrivyClient({ appId, appSecret });
-    return privyClient;
-  } catch (err) {
-    console.error('Failed to initialize Privy client:', err);
-    return null;
-  }
+function getPrivyJWKS(appId: string) {
+  if (privyJWKS) return privyJWKS;
+
+  const jwksUrl = new URL(`https://auth.privy.io/api/v1/apps/${appId}/jwks.json`);
+  privyJWKS = createRemoteJWKSet(jwksUrl);
+
+  return privyJWKS;
 }
 
 export async function getOrCreateUser(privyId: string, walletAddress?: string): Promise<string> {
@@ -61,17 +58,30 @@ export async function verifyPrivyToken(authHeader: string | null): Promise<strin
   }
 
   const token = authHeader.replace('Bearer ', '');
-  const client = await getPrivyClient();
 
-  if (!client) {
+  if (!token || token === 'null' || token === 'undefined') {
+    return null;
+  }
+
+  const { appId, verificationKey } = getPrivyConfig();
+
+  if (!appId) {
+    console.warn('PRIVY_APP_ID not configured');
     return null;
   }
 
   try {
-    const verifiedClaims = await client.utils().auth().verifyAccessToken({
-      access_token: token
+    const { verifyAccessToken } = await import('@privy-io/node');
+
+    const verifyKey = verificationKey || getPrivyJWKS(appId);
+
+    const verifiedClaims = await verifyAccessToken({
+      access_token: token,
+      app_id: appId,
+      verification_key: verifyKey,
     });
-    return verifiedClaims.userId;
+
+    return verifiedClaims.user_id;
   } catch (err) {
     console.error('Failed to verify Privy token:', err);
     return null;
