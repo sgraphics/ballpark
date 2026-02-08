@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as dotenv from 'dotenv';
 import path from 'path';
 
+// Load .env.local first (real credentials), then .env as fallback
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 process.env.BALLPARK_DB_DEBUG = 'true';
