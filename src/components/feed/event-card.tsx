@@ -13,6 +13,7 @@ import {
   CheckCircle,
   AlertTriangle,
   CheckSquare,
+  Loader2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +24,12 @@ const eventConfig: Record<EventType, {
   icon: typeof Plus;
   label: string;
   variant: 'default' | 'buyer' | 'seller' | 'success' | 'warning' | 'error';
+  spinning?: boolean;
 }> = {
   listing_created: { icon: Plus, label: 'New Listing', variant: 'seller' },
   match_found: { icon: Target, label: 'Match Found', variant: 'buyer' },
   negotiation_started: { icon: MessageSquare, label: 'Negotiation Started', variant: 'default' },
+  agent_processing: { icon: Loader2, label: 'Agent Thinking', variant: 'default', spinning: true },
   buyer_proposes: { icon: MessageSquare, label: 'Buyer Proposes', variant: 'buyer' },
   seller_counters: { icon: Reply, label: 'Seller Counters', variant: 'seller' },
   human_input_required: { icon: HelpCircle, label: 'Input Needed', variant: 'warning' },
@@ -38,17 +41,25 @@ const eventConfig: Record<EventType, {
   issue_resolved: { icon: CheckSquare, label: 'Resolved', variant: 'success' },
 };
 
-export function EventCard({ event }: { event: AppEvent }) {
+interface EventCardProps {
+  event: AppEvent;
+  compact?: boolean;
+  showThumbnail?: boolean;
+}
+
+export function EventCard({ event, compact = false, showThumbnail = false }: EventCardProps) {
   const config = eventConfig[event.type] || {
     icon: MessageSquare,
     label: event.type,
     variant: 'default' as const,
   };
   const Icon = config.icon;
+  const isSpinning = config.spinning;
   const p = event.payload;
-  const title = typeof p.title === 'string' ? p.title : null;
-  const message = typeof p.message === 'string' ? p.message : null;
-  const price = typeof p.price === 'number' ? p.price : null;
+  const title = typeof p.listing_title === 'string' ? p.listing_title : (typeof p.title === 'string' ? p.title : null);
+  const message = typeof p.status_message === 'string' ? p.status_message : (typeof p.message === 'string' ? p.message : null);
+  const price = typeof p.price_proposal === 'number' ? p.price_proposal : (typeof p.price === 'number' ? p.price : null);
+  const thumbnail = showThumbnail && typeof p.thumbnail_url === 'string' ? p.thumbnail_url : null;
 
   const link =
     typeof p.negotiation_id === 'string'
@@ -58,10 +69,13 @@ export function EventCard({ event }: { event: AppEvent }) {
         : null;
 
   const inner = (
-    <Card interactive={!!link} className="animate-fade-in group">
+    <Card interactive={!!link} className={`animate-fade-in group ${compact ? 'p-2' : ''}`}>
       <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-gray-50 text-bp-muted group-hover:scale-105 transition-transform">
-          <Icon className="w-4 h-4" />
+        {thumbnail && (
+          <img src={thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+        )}
+        <div className={`p-2 rounded-lg bg-gray-50 text-bp-muted group-hover:scale-105 transition-transform ${isSpinning ? 'animate-pulse' : ''}`}>
+          <Icon className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

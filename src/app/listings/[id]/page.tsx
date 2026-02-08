@@ -6,6 +6,7 @@ import { ArrowLeft, Tag, Shield, Crosshair, DollarSign, Loader2 } from 'lucide-r
 import { MainLayout } from '@/components/layout/main-layout';
 import { ImageGallery } from '@/components/listings/image-gallery';
 import { StructuredFields } from '@/components/listings/structured-fields';
+import { EventFeed } from '@/components/feed/event-feed';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -230,13 +231,14 @@ export default function ListingDetailPage() {
             )}
 
             <Card dark>
-              <h3 className="font-heading text-sm font-medium mb-3 text-white">Status Rail</h3>
-              <p className="text-xs text-gray-400">
-                Negotiation status updates will appear here once a buy agent initiates contact.
-              </p>
-              <div className="mt-4 px-3 py-2.5 rounded-lg bg-bp-dark border border-bp-border-dark">
-                <p className="text-xs text-gray-500">No active negotiations</p>
-              </div>
+              <EventFeed
+                listingId={listing.id}
+                title="Listing Activity"
+                showPromptFilter={true}
+                compact={true}
+                emptyMessage="No activity yet. Waiting for buy agents to discover this listing."
+                autoScroll={true}
+              />
             </Card>
 
             <div className="flex flex-col gap-2">

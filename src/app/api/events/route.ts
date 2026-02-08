@@ -11,6 +11,10 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
     const type = url.searchParams.get('type');
+    const types = url.searchParams.get('types');
+    const listingId = url.searchParams.get('listing_id');
+    const negotiationId = url.searchParams.get('negotiation_id');
+    const promptOnly = url.searchParams.get('prompt_only') === 'true';
     const limit = parseInt(url.searchParams.get('limit') || '50', 10);
     const offset = parseInt(url.searchParams.get('offset') || '0', 10);
 
@@ -26,6 +30,26 @@ export async function GET(req: NextRequest) {
     if (type) {
       conditions.push(`type = $${paramIdx++}`);
       params.push(type);
+    }
+
+    if (types) {
+      const typeList = types.split(',');
+      conditions.push(`type = ANY($${paramIdx++})`);
+      params.push(typeList);
+    }
+
+    if (listingId) {
+      conditions.push(`payload->>'listing_id' = $${paramIdx++}`);
+      params.push(listingId);
+    }
+
+    if (negotiationId) {
+      conditions.push(`payload->>'negotiation_id' = $${paramIdx++}`);
+      params.push(negotiationId);
+    }
+
+    if (promptOnly) {
+      conditions.push(`type = 'human_input_required'`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

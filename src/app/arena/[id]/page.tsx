@@ -5,10 +5,12 @@ import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { DuelArena } from '@/components/arena/duel-arena';
 import { StatusRail } from '@/components/arena/status-rail';
 import { HumanInput } from '@/components/arena/human-input';
 import { ImageGallery } from '@/components/listings/image-gallery';
+import { EventFeed } from '@/components/feed/event-feed';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage } from '@/types/database';
 
 interface ArenaPageProps {
@@ -253,11 +255,37 @@ export default function ArenaPage({ params }: ArenaPageProps) {
         )}
 
         <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-4">
-            <ImageGallery images={listing.image_urls} />
+          <div className="col-span-3">
+            <div className="sticky top-4 space-y-4">
+              <ImageGallery images={listing.image_urls} />
+              <Card>
+                <div className="text-xs text-bp-muted space-y-1">
+                  <div className="flex justify-between">
+                    <span>Ask Price</span>
+                    <span className="font-medium text-bp-seller">${listing.ask_price}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Category</span>
+                    <span className="font-medium">{listing.category}</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </div>
-          <div className="col-span-8">
+          <div className="col-span-5">
             <StatusRail messages={messages} />
+          </div>
+          <div className="col-span-4">
+            <Card dark>
+              <EventFeed
+                negotiationId={negotiation.id}
+                title="Live Feed"
+                compact={true}
+                showPromptFilter={true}
+                emptyMessage="Waiting for activity..."
+                autoScroll={true}
+              />
+            </Card>
           </div>
         </div>
       </div>

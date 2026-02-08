@@ -102,6 +102,21 @@ export async function POST(req: NextRequest) {
       messages,
     };
 
+    const agentRole = negotiation.ball === 'buyer' ? 'Buyer' : 'Seller';
+    await query(
+      `INSERT INTO events (type, payload) VALUES ($1, $2)`,
+      [
+        'agent_processing',
+        JSON.stringify({
+          negotiation_id,
+          listing_id: listing.id,
+          listing_title: listing.title,
+          status_message: `${agentRole} agent is thinking...`,
+          agent_role: agentRole.toLowerCase(),
+        }),
+      ]
+    );
+
     const result = isGeminiConfigured()
       ? await runOrchestrationStep(ctx)
       : generateDemoResponse(ctx);

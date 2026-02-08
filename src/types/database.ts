@@ -115,6 +115,7 @@ export type EventType =
   | 'listing_created'
   | 'match_found'
   | 'negotiation_started'
+  | 'agent_processing'
   | 'buyer_proposes'
   | 'seller_counters'
   | 'human_input_required'
