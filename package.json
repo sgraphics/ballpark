@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {
     "@account-kit/privy-integration": "^4.83.2",
@@ -45,6 +46,7 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
     "vitest": "^2.1.6"
   }
 }
