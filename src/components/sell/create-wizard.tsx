@@ -124,10 +124,29 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const imageUrls = images.map(
-        (_, i) =>
-          `https://images.pexels.com/photos/${3944405 + i * 100}/pexels-photo-${3944405 + i * 100}.jpeg?auto=compress&cs=tinysrgb&w=800`
-      );
+      const imageUrls: string[] = [];
+      for (const img of images) {
+        const signRes = await fetch('/api/uploads/sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: img.file.name,
+            contentType: img.file.type,
+          }),
+        });
+        const signData = await signRes.json();
+
+        if (signData.uploadUrl && !signData.demo) {
+          await fetch(signData.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': img.file.type },
+            body: img.file,
+          });
+          imageUrls.push(signData.publicUrl);
+        } else {
+          imageUrls.push(`data:${img.file.type};base64,${img.base64}`);
+        }
+      }
 
       const listingPayload = {
         title: formData.title,
@@ -139,7 +158,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         haggling_ammo: analysis?.haggling_ammo || [],
         image_urls: imageUrls,
         hero_image_url: heroImageUrl?.startsWith('data:') ? null : heroImageUrl,
-        hero_thumbnail_url: heroThumbnailUrl,
+        hero_thumbnail_url: heroThumbnailUrl?.startsWith('data:') ? null : heroThumbnailUrl,
       };
 
       const listingRes = authenticated

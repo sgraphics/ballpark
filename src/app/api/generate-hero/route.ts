@@ -6,7 +6,7 @@ import { uploadBase64Image, generateHeroPath, generateThumbnailPath, isGcsConfig
 async function createThumbnail(base64Data: string): Promise<string> {
   const buffer = Buffer.from(base64Data, 'base64');
   const thumbnailBuffer = await sharp(buffer)
-    .resize(400, 300, { fit: 'inside', withoutEnlargement: true })
+    .resize(600, 450, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer();
   return thumbnailBuffer.toString('base64');
