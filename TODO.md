@@ -398,22 +398,21 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
-## MILESTONE 7: Automatic Orchestrator [TODO]
-**Status: NOT STARTED**
+## MILESTONE 7: Automatic Orchestrator [PARTIAL]
+**Status: IN PROGRESS**
 **Priority: HIGH**
 
-### 7.1 Auto-Start on Negotiation Creation
-- [ ] Modify POST /api/negotiations to trigger first buyer agent step
-- [ ] Create orchestration queue/job system
-- [ ] Add `is_processing` flag to negotiation to prevent duplicate runs
-- [ ] Emit `negotiation_started` event with initial context
+### 7.1 Auto-Start on Negotiation Creation [DONE]
+- [x] Modify POST /api/negotiations to trigger first buyer agent step
+- [x] Add in-memory processing lock to prevent duplicate runs
+- [x] Emit `negotiation_started` event with initial context
 
-### 7.2 Auto-Continue After Each Turn
-- [ ] After buyer agent responds, auto-trigger seller agent
-- [ ] After seller agent responds, auto-trigger buyer agent
-- [ ] Pause auto-run when `ball === 'human'`
-- [ ] Resume auto-run after human response submitted
-- [ ] Add configurable delay between turns (500ms-2s for dramatic effect)
+### 7.2 Auto-Continue After Each Turn [DONE]
+- [x] After buyer agent responds, auto-trigger seller agent (1.5s delay)
+- [x] After seller agent responds, auto-trigger buyer agent
+- [x] Pause auto-run when `ball === 'human'`
+- [x] Resume auto-run after human response submitted
+- [x] Add configurable delay between turns (1.5s for dramatic effect)
 
 ### 7.3 Stream Status to Feed
 - [ ] Emit events during orchestration: `agent_processing`, `buyer_proposes`, etc.
@@ -475,11 +474,11 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 - [ ] Debounce to prevent multiple simultaneous searches
 - [ ] Cache results for 5 minutes to reduce API calls
 
-### 9.3 Negotiate Button Creates Negotiation
-- [ ] Fix handleNegotiate to call POST /api/negotiations
-- [ ] Navigate to /arena/[negotiation_id] after creation
-- [ ] Auto-start orchestration (triggers first buyer move)
-- [ ] Update match status to 'negotiating' atomically
+### 9.3 Negotiate Button Creates Negotiation [DONE]
+- [x] Fix handleNegotiate to call POST /api/negotiations
+- [x] Navigate to /arena/[negotiation_id] after creation
+- [x] Auto-start orchestration (triggers first buyer move)
+- [x] Update match status to 'negotiating' atomically
 
 ---
 
@@ -501,8 +500,8 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ## Implementation Order (Priority)
 
-1. **MILESTONE 7.1-7.2**: Auto-orchestration (core missing feature)
-2. **MILESTONE 9.3**: Negotiate button creates negotiation (broken flow)
+1. ~~**MILESTONE 7.1-7.2**: Auto-orchestration (core missing feature)~~ **DONE**
+2. ~~**MILESTONE 9.3**: Negotiate button creates negotiation (broken flow)~~ **DONE**
 3. **MILESTONE 6.1-6.2**: Unified feed component (enables filtering)
 4. **MILESTONE 7.3**: Stream status to feed (real-time feel)
 5. **MILESTONE 8.1**: Listing page negotiation view
