@@ -220,6 +220,14 @@ function getSslConfig(databaseUrl: string): any | undefined {
   return sslOptions;
 }
 
+export async function query<T extends pg.QueryResultRow = any>(
+  text: string,
+  params?: unknown[],
+): Promise<pg.QueryResult<T>> {
+  const pool = getPool();
+  return pool.query<T>(text, params);
+}
+
 export function getPool(): Pool {
   if (globalThis.__ballparkPgPool) return globalThis.__ballparkPgPool;
 
