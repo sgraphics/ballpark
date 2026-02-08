@@ -184,6 +184,18 @@ const migrations: Migration[] = [
       END $$;
     `,
   },
+  {
+    id: '012',
+    name: 'make_wallet_address_nullable',
+    sql: `
+      DO $$
+      BEGIN
+        ALTER TABLE users ALTER COLUMN wallet_address DROP NOT NULL;
+      EXCEPTION WHEN others THEN
+        NULL;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations(): Promise<{ applied: string[]; skipped: string[] }> {

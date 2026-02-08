@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { query } from './db';
+import type { User } from '@/types/database';
 
 let privyClient: any = null;
 
@@ -21,6 +23,30 @@ async function getPrivyClient(): Promise<any | null> {
     console.error('Failed to initialize Privy client:', err);
     return null;
   }
+}
+
+export async function getOrCreateUser(privyId: string, walletAddress?: string): Promise<string> {
+  const existing = await query<User>(
+    'SELECT id, wallet_address FROM users WHERE privy_id = $1',
+    [privyId]
+  );
+
+  if (existing.rows.length > 0) {
+    if (walletAddress && !existing.rows[0].wallet_address) {
+      await query(
+        'UPDATE users SET wallet_address = $1 WHERE id = $2',
+        [walletAddress, existing.rows[0].id]
+      );
+    }
+    return existing.rows[0].id;
+  }
+
+  const result = await query<User>(
+    'INSERT INTO users (privy_id, wallet_address) VALUES ($1, $2) RETURNING id',
+    [privyId, walletAddress || null]
+  );
+
+  return result.rows[0].id;
 }
 
 export async function verifyPrivyToken(authHeader: string | null): Promise<string | null> {
@@ -46,9 +72,23 @@ export async function verifyPrivyToken(authHeader: string | null): Promise<strin
   }
 }
 
-export async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
+export async function getPrivyIdFromRequest(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
   return verifyPrivyToken(authHeader);
+}
+
+export async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
+  const privyId = await getPrivyIdFromRequest(req);
+  if (!privyId) {
+    return null;
+  }
+
+  try {
+    return await getOrCreateUser(privyId);
+  } catch (err) {
+    console.error('Failed to get or create user:', err);
+    return null;
+  }
 }
 
 export function requireAuth(userId: string | null, errorMessage = 'Authentication required') {
