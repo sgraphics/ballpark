@@ -126,26 +126,21 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
     try {
       const imageUrls: string[] = [];
       for (const img of images) {
-        const signRes = await fetch('/api/uploads/sign', {
+        const uploadRes = await fetch('/api/uploads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             filename: img.file.name,
             contentType: img.file.type,
+            data: img.base64,
           }),
         });
-        const signData = await signRes.json();
+        const uploadData = await uploadRes.json();
 
-        if (signData.uploadUrl && !signData.demo) {
-          await fetch(signData.uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': img.file.type },
-            body: img.file,
-          });
-          imageUrls.push(signData.publicUrl);
-        } else {
-          imageUrls.push(`data:${img.file.type};base64,${img.base64}`);
+        if (uploadData.error) {
+          throw new Error(uploadData.error);
         }
+        imageUrls.push(uploadData.publicUrl);
       }
 
       const listingPayload = {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Search, Bot, RefreshCw, Inbox } from 'lucide-react';
+import { Plus, Search, Bot, RefreshCw, Inbox, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { BuyAgentCard } from '@/components/buy/buy-agent-card';
 import { MatchCard } from '@/components/buy/match-card';
 import { useAppStore } from '@/store/app-store';
-import type { BuyAgent } from '@/types/database';
 
 interface EnrichedMatch {
   id: string;
@@ -26,134 +25,6 @@ interface EnrichedMatch {
   listing_condition_notes?: { issue: string; confidence: 'high' | 'medium' | 'low' }[];
 }
 
-const DEMO_AGENTS: BuyAgent[] = [
-  {
-    id: 'demo-buy-1',
-    user_id: '',
-    name: 'Vintage Jacket Finder',
-    category: 'clothing',
-    filters: { condition: 'Good', gender: 'Men' },
-    prompt: 'Looking for vintage leather jackets in good condition. Prefer classic styles.',
-    max_price: 500,
-    urgency: 'medium',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'demo-buy-2',
-    user_id: '',
-    name: 'Laptop Deal Hunter',
-    category: 'electronics',
-    filters: { brand: 'Apple', condition: 'Like New' },
-    prompt: 'Need a MacBook Pro for work. M-series chip preferred.',
-    max_price: 2000,
-    urgency: 'high',
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-  },
-  {
-    id: 'demo-buy-3',
-    user_id: '',
-    name: 'Office Furniture Scout',
-    category: 'furniture',
-    filters: { material: 'Wood' },
-    prompt: 'Looking for a solid desk and ergonomic chair for home office.',
-    max_price: 1200,
-    urgency: 'low',
-    created_at: new Date(Date.now() - 345600000).toISOString(),
-  },
-];
-
-const DEMO_MATCHES: Record<string, EnrichedMatch[]> = {
-  'demo-buy-1': [
-    {
-      id: 'match-1',
-      buy_agent_id: 'demo-buy-1',
-      listing_id: 'demo-1',
-      score: 82,
-      reason: 'Within budget. 2/3 filters matched. 2 verified condition details',
-      status: 'potential',
-      created_at: new Date().toISOString(),
-      listing_title: 'Vintage Leather Jacket',
-      listing_price: 450,
-      listing_images: ['https://images.pexels.com/photos/1124468/pexels-photo-1124468.jpeg?auto=compress&cs=tinysrgb&w=400'],
-      listing_category: 'clothing',
-      listing_condition_notes: [
-        { issue: 'Light scuffing on left elbow', confidence: 'high' },
-        { issue: 'Minor fading on collar', confidence: 'medium' },
-      ],
-    },
-    {
-      id: 'match-2',
-      buy_agent_id: 'demo-buy-1',
-      listing_id: 'demo-6',
-      score: 58,
-      reason: 'Within budget. 1/3 filters matched',
-      status: 'potential',
-      created_at: new Date().toISOString(),
-      listing_title: 'Nike Air Jordan 1 Retro High OG',
-      listing_price: 380,
-      listing_images: ['https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=400'],
-      listing_category: 'clothing',
-      listing_condition_notes: [
-        { issue: 'Deadstock, never worn', confidence: 'high' },
-      ],
-    },
-  ],
-  'demo-buy-2': [
-    {
-      id: 'match-3',
-      buy_agent_id: 'demo-buy-2',
-      listing_id: 'demo-2',
-      score: 91,
-      reason: 'Within budget. 2/2 filters matched. 2 verified condition details',
-      status: 'potential',
-      created_at: new Date().toISOString(),
-      listing_title: 'MacBook Pro 16" M2 Pro',
-      listing_price: 1800,
-      listing_images: ['https://images.pexels.com/photos/303383/pexels-photo-303383.jpeg?auto=compress&cs=tinysrgb&w=400'],
-      listing_category: 'electronics',
-      listing_condition_notes: [
-        { issue: 'Battery cycle count: 47', confidence: 'high' },
-        { issue: 'Hairline mark near trackpad', confidence: 'low' },
-      ],
-    },
-  ],
-  'demo-buy-3': [
-    {
-      id: 'match-4',
-      buy_agent_id: 'demo-buy-3',
-      listing_id: 'demo-3',
-      score: 76,
-      reason: 'Within budget. 1/1 filters matched. 2 verified condition details',
-      status: 'potential',
-      created_at: new Date().toISOString(),
-      listing_title: 'Mid-Century Modern Desk',
-      listing_price: 650,
-      listing_images: ['https://images.pexels.com/photos/2451264/pexels-photo-2451264.jpeg?auto=compress&cs=tinysrgb&w=400'],
-      listing_category: 'furniture',
-      listing_condition_notes: [
-        { issue: 'Small water ring on top surface', confidence: 'high' },
-        { issue: 'One drawer slightly stiff', confidence: 'medium' },
-      ],
-    },
-    {
-      id: 'match-5',
-      buy_agent_id: 'demo-buy-3',
-      listing_id: 'demo-5',
-      score: 62,
-      reason: 'Within budget. Verified condition details',
-      status: 'potential',
-      created_at: new Date().toISOString(),
-      listing_title: 'Herman Miller Aeron Chair',
-      listing_price: 890,
-      listing_images: ['https://images.pexels.com/photos/1957478/pexels-photo-1957478.jpeg?auto=compress&cs=tinysrgb&w=400'],
-      listing_category: 'furniture',
-      listing_condition_notes: [
-        { issue: 'Mesh in excellent condition, no sag', confidence: 'high' },
-      ],
-    },
-  ],
-};
-
 export default function BuyAgentsPage() {
   const { buyAgents, setBuyAgents } = useAppStore();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -161,28 +32,71 @@ export default function BuyAgentsPage() {
   const [running, setRunning] = useState(false);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   const [actionLoading, setActionLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
 
+  // Fetch buy agents from API on mount
   useEffect(() => {
-    if (buyAgents.length === 0) {
-      setBuyAgents(DEMO_AGENTS);
+    async function loadAgents() {
+      try {
+        const res = await fetch('/api/buy-agents');
+        const data = await res.json();
+        if (data.agents) {
+          setBuyAgents(data.agents);
+        }
+      } catch (err) {
+        console.error('Failed to load buy agents:', err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [buyAgents.length, setBuyAgents]);
+    loadAgents();
+  }, [setBuyAgents]);
 
+  // Fetch match counts for all agents once agents are loaded
   useEffect(() => {
-    const counts: Record<string, number> = {};
-    for (const agent of DEMO_AGENTS) {
-      const demoMatches = DEMO_MATCHES[agent.id] || [];
-      counts[agent.id] = demoMatches.filter((m) => m.status === 'potential').length;
+    if (buyAgents.length === 0) return;
+
+    async function loadMatchCounts() {
+      try {
+        const res = await fetch('/api/matches');
+        const data = await res.json();
+        const allMatches: EnrichedMatch[] = data.matches || [];
+        const counts: Record<string, number> = {};
+        for (const m of allMatches) {
+          if (m.status === 'potential') {
+            counts[m.buy_agent_id] = (counts[m.buy_agent_id] || 0) + 1;
+          }
+        }
+        setMatchCounts(counts);
+      } catch (err) {
+        console.error('Failed to load match counts:', err);
+      }
     }
-    setMatchCounts(counts);
+    loadMatchCounts();
+  }, [buyAgents]);
+
+  // Fetch matches for the selected agent
+  const fetchMatchesForAgent = useCallback(async (agentId: string) => {
+    setMatchesLoading(true);
+    try {
+      const res = await fetch(`/api/matches?buy_agent_id=${agentId}`);
+      const data = await res.json();
+      setMatches(data.matches || []);
+    } catch (err) {
+      console.error('Failed to load matches:', err);
+      setMatches([]);
+    } finally {
+      setMatchesLoading(false);
+    }
   }, []);
 
   const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
-    const demoMatches = DEMO_MATCHES[agentId] || [];
-    setMatches(demoMatches);
-  }, []);
+    fetchMatchesForAgent(agentId);
+  }, [fetchMatchesForAgent]);
 
+  // Auto-select first agent once loaded
   useEffect(() => {
     if (buyAgents.length > 0 && !selectedAgentId) {
       handleSelectAgent(buyAgents[0].id);
@@ -200,22 +114,21 @@ export default function BuyAgentsPage() {
         body: JSON.stringify({ buy_agent_id: selectedAgentId }),
       });
 
-      const data = await res.json();
+      await res.json();
 
-      if (data.matches && data.matches.length > 0) {
-        const matchRes = await fetch(`/api/matches?buy_agent_id=${selectedAgentId}`);
-        const matchData = await matchRes.json();
-        setMatches(matchData.matches || []);
+      // Refresh matches for the selected agent
+      const matchRes = await fetch(`/api/matches?buy_agent_id=${selectedAgentId}`);
+      const matchData = await matchRes.json();
+      setMatches(matchData.matches || []);
 
-        setMatchCounts((prev) => ({
-          ...prev,
-          [selectedAgentId]: (matchData.matches || []).filter(
-            (m: EnrichedMatch) => m.status === 'potential'
-          ).length,
-        }));
-      }
-    } catch {
-      // If DB not connected, keep demo data
+      setMatchCounts((prev) => ({
+        ...prev,
+        [selectedAgentId]: (matchData.matches || []).filter(
+          (m: EnrichedMatch) => m.status === 'potential'
+        ).length,
+      }));
+    } catch (err) {
+      console.error('Finder run failed:', err);
     } finally {
       setRunning(false);
     }
@@ -266,6 +179,16 @@ export default function BuyAgentsPage() {
 
   const potentialMatches = matches.filter((m) => m.status === 'potential');
   const otherMatches = matches.filter((m) => m.status !== 'potential');
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-6 h-6 text-bp-buyer animate-spin" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -334,7 +257,14 @@ export default function BuyAgentsPage() {
                   </Button>
                 </div>
 
-                {potentialMatches.length === 0 && !running && (
+                {matchesLoading && (
+                  <Card className="text-center py-12">
+                    <Loader2 className="w-6 h-6 text-bp-buyer animate-spin mx-auto mb-3" />
+                    <p className="text-sm text-bp-muted">Loading matches...</p>
+                  </Card>
+                )}
+
+                {potentialMatches.length === 0 && !running && !matchesLoading && (
                   <Card className="text-center py-12">
                     <Inbox className="w-8 h-8 text-bp-muted-light mx-auto mb-3" />
                     <p className="text-sm text-bp-muted">No potential matches yet</p>
