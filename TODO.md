@@ -14,21 +14,42 @@ Bolt.new has a current build issue where the build process wipes the working dir
 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
 ```
 
-**Workflow for ANY Change:**
-1. Make your code changes
-2. Add and commit changes to git with a scoped commit message
+**Workflow for ANY Change (MUST FOLLOW EXACTLY):**
+
+1. **PULL FIRST** - Always pull latest changes before starting:
+   ```bash
+   git pull origin main
+   ```
+
+2. **Implement changes** - Make code changes and write/update tests
+
+3. **Quality checks** - Verify code quality:
+   ```bash
+   npx tsc --noEmit  # Check TypeScript
+   npm run lint       # Run linter (if configured)
+   ```
+
+4. **COMMIT** - Add and commit with scoped message:
    ```bash
    git add -A
    git commit -m "feat: description of changes"
    ```
-3. Push to GitHub using the PAT above
+
+5. **PUSH** - Push to GitHub using PAT:
    ```bash
    git push https://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@github.com/sgraphics/ballpark.git main
    ```
-4. Run `npm run build` to verify the build works
-5. User refreshes the page to restore from GitHub if needed
 
-**CRITICAL:** NEVER use `git init` or reset git history. Always make incremental, scoped commits to preserve project history.
+6. **Summary** - Provide brief summary of what was changed
+
+7. **BUILD** - User or bolt.new will handle building - DO NOT run build commands
+
+**CRITICAL RULES:**
+- ❌ NEVER run `git init` - this wipes ALL commit history
+- ❌ NEVER force push without pulling first
+- ❌ NEVER reset or rebase - preserve all commit history
+- ✅ ALWAYS pull before starting work
+- ✅ DO NOT worry about building - that's handled separately
 
 This workflow is confirmed with bolt.new helpdesk and is the official workaround until the build issue is resolved.
 
