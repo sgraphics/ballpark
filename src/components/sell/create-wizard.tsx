@@ -46,7 +46,6 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
     urgency: 'medium',
     agent_name: '',
   });
-
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setHeroGenerating(true);

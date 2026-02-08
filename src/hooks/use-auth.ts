@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/app-store';
 import { useCallback } from 'react';
 
 export function useAuth() {
-  const { ready, authenticated, user, getAccessToken } = usePrivy();
+  const { ready, authenticated, user, getAccessToken, login } = usePrivy();
   const currentUser = useAppStore((s) => s.currentUser);
 
   const fetchWithAuth = useCallback(
@@ -38,5 +38,6 @@ export function useAuth() {
     walletAddress: currentUser?.wallet_address || null,
     fetchWithAuth,
     getAccessToken,
+    login,
   };
 }

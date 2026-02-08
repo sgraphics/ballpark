@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 import { CreateWizard } from '@/components/sell/create-wizard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -45,16 +46,18 @@ export default function NewSellAgentPage() {
   }
 
   return (
-    <MainLayout>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="font-heading text-2xl font-light tracking-tight">New Sell Agent</h1>
-          <p className="text-sm text-bp-muted mt-0.5">
-            Upload photos, get AI analysis, and create your listing with an automated sell agent.
-          </p>
+    <ProtectedRoute>
+      <MainLayout>
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="font-heading text-2xl font-light tracking-tight">New Sell Agent</h1>
+            <p className="text-sm text-bp-muted mt-0.5">
+              Upload photos, get AI analysis, and create your listing with an automated sell agent.
+            </p>
+          </div>
+          <CreateWizard onComplete={setCompleted} />
         </div>
-        <CreateWizard onComplete={setCompleted} />
-      </div>
-    </MainLayout>
+      </MainLayout>
+    </ProtectedRoute>
   );
 }
