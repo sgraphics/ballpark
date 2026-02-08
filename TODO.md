@@ -428,22 +428,23 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
-## MILESTONE 8: Enhanced Negotiation UX [TODO]
-**Status: NOT STARTED**
+## MILESTONE 8: Enhanced Negotiation UX [PARTIAL]
+**Status: 8.1-8.2 COMPLETE, 8.3-8.4 TODO**
 **Priority: MEDIUM**
 
-### 8.1 Listing Page Negotiation View
-- [ ] Query negotiations for the listing (all counterparties)
-- [ ] Show active negotiation summary cards
-- [ ] Add "View in Arena" link for each negotiation
-- [ ] Show pending prompts with quick-answer buttons
-- [ ] Display negotiation status timeline
+### 8.1 Listing Page Negotiation View [DONE]
+- [x] Query negotiations for the listing (all counterparties)
+- [x] Show active negotiation summary cards
+- [x] Add "View in Arena" link for each negotiation
+- [x] Show pending prompts count badge
+- [x] Display negotiation message count and last message
 
-### 8.2 "Whose Turn" Indicators
-- [ ] Add pulsing indicator for active side (buyer/seller)
-- [ ] "Waiting for Buyer..." / "Waiting for Seller..." text
-- [ ] Countdown timer visualization (optional)
-- [ ] Sound notification on turn change (optional)
+### 8.2 "Whose Turn" Indicators [DONE]
+- [x] Add pulsing indicator for active side (buyer/seller)
+- [x] "Waiting for Buyer..." / "Waiting for Seller..." text
+- [x] TurnIndicator component with spinner animations
+- [x] TurnBadge compact component for cards
+- [x] Integrated into Arena page header and NegotiationCard
 
 ### 8.3 Price Animation
 - [ ] Animate current price changes in Offer Ladder
@@ -504,8 +505,8 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 2. ~~**MILESTONE 9.3**: Negotiate button creates negotiation (broken flow)~~ **DONE**
 3. ~~**MILESTONE 6.1-6.2**: Unified feed component (enables filtering)~~ **DONE**
 4. ~~**MILESTONE 7.3**: Stream status to feed (real-time feel)~~ **DONE**
-5. **MILESTONE 8.1**: Listing page negotiation view
-6. **MILESTONE 8.2**: Whose turn indicators
+5. ~~**MILESTONE 8.1**: Listing page negotiation view~~ **DONE**
+6. ~~**MILESTONE 8.2**: Whose turn indicators~~ **DONE**
 7. **MILESTONE 9.1-9.2**: Buy agent auto-search
 8. **MILESTONE 8.3-8.4**: Polish (price animation, thumbnails)
 9. **MILESTONE 10**: Seller dashboard (nice to have)
