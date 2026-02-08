@@ -7,6 +7,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { ImageGallery } from '@/components/listings/image-gallery';
 import { StructuredFields } from '@/components/listings/structured-fields';
 import { EventFeed } from '@/components/feed/event-feed';
+import { ListingNegotiations } from '@/components/negotiation/listing-negotiations';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -230,22 +231,23 @@ export default function ListingDetailPage() {
               </Card>
             )}
 
+            <Card>
+              <ListingNegotiations
+                listingId={listing.id}
+                title="Negotiations"
+              />
+            </Card>
+
             <Card dark>
               <EventFeed
                 listingId={listing.id}
-                title="Listing Activity"
+                title="Activity Feed"
                 showPromptFilter={true}
                 compact={true}
                 emptyMessage="No activity yet. Waiting for buy agents to discover this listing."
                 autoScroll={true}
               />
             </Card>
-
-            <div className="flex flex-col gap-2">
-              <Button variant="buyer" className="w-full">
-                Negotiate
-              </Button>
-            </div>
           </div>
         </div>
       </div>

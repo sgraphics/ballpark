@@ -11,6 +11,7 @@ import { StatusRail } from '@/components/arena/status-rail';
 import { HumanInput } from '@/components/arena/human-input';
 import { ImageGallery } from '@/components/listings/image-gallery';
 import { EventFeed } from '@/components/feed/event-feed';
+import { TurnIndicator, TurnBadge } from '@/components/negotiation/turn-indicator';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage } from '@/types/database';
 
 interface ArenaPageProps {
@@ -221,15 +222,21 @@ export default function ArenaPage({ params }: ArenaPageProps) {
               </Button>
             </Link>
             <div>
-              <h1 className="font-heading text-xl font-light tracking-tight">{listing.title}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="font-heading text-xl font-light tracking-tight">{listing.title}</h1>
+                <TurnBadge ball={negotiation.ball} state={negotiation.state} />
+              </div>
               <p className="text-xs text-bp-muted mt-0.5">Negotiation #{negotiation.id.slice(0, 8)}</p>
             </div>
           </div>
-          <Link href={`/listings/${listing.id}`}>
-            <Button variant="secondary" size="sm">
-              <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> View Listing
-            </Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <TurnIndicator ball={negotiation.ball} state={negotiation.state} />
+            <Link href={`/listings/${listing.id}`}>
+              <Button variant="secondary" size="sm">
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> View Listing
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="mb-6">
