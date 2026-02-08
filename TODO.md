@@ -301,3 +301,214 @@ DEV_MODE=true
 - **Style**: Polymarket-like, cards > chat bubbles, no gradients
 
 ---
+
+## AUDIT (2026-02-08)
+
+### Data Model Summary
+The data model follows this relationship chain:
+```
+Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
+              \
+               \--> BuyAgent (1) <-- (N) Match
+```
+
+- **Listing** can have many **Matches** (one per BuyAgent that finds it via Finder)
+- Each **Match** can lead to 0 or 1 **Negotiation** (when user clicks "Negotiate", status becomes 'negotiating')
+- Each **Negotiation** has many **NegMessages** (the turn-by-turn AI conversation)
+- **SellAgent** is 1:1 with Listing (stores seller's negotiation preferences)
+- **BuyAgent** can have many Matches across different Listings
+
+### Event Types (Current)
+| Event Type | Description |
+|------------|-------------|
+| listing_created | New listing published |
+| match_found | Finder found a potential match |
+| negotiation_started | User clicked "Negotiate" on a match |
+| buyer_proposes | Buyer agent made an offer |
+| seller_counters | Seller agent countered |
+| human_input_required | Agent needs human decision |
+| deal_agreed | Both sides agreed on price |
+| escrow_created | Seller created escrow contract |
+| escrow_funded | Buyer deposited funds |
+| delivery_confirmed | Buyer confirmed receipt |
+| issue_flagged | Buyer flagged an issue |
+| issue_resolved | Admin resolved the issue |
+
+### What Works
+- Create listings (full wizard with AI analysis)
+- Create buy agents (with filters and preferences)
+- Run Finder to discover matches
+- Basic negotiation flow with manual "Run Agent" button
+- Duel Arena UI with HUD-style design
+- SSE streaming for negotiation updates
+- Escrow contract integration
+- Admin panel for flagged issues
+
+### What's Missing (Gap Analysis)
+
+#### SELLER EXPERIENCE GAPS
+1. **Listing page doesn't show negotiations** - Status rail shows "No active negotiations" even when negotiations exist
+2. **No filtered feed on listing page** - Should show events only for this listing
+3. **No prompt-type indicators** - Seller can't see what needs their input at a glance
+4. **Can't browse negotiations from listing page** - Need to navigate to Arena separately
+
+#### BUYER EXPERIENCE GAPS
+1. **No auto-search on agent open** - Must manually click "Run Finder"
+2. **Negotiate button doesn't create negotiation** - Only updates match status, no negotiation record
+3. **No filtered feed for buyer's negotiation** - Should see events for their specific negotiation
+4. **Buy agent state not tracked** - No "Active" state that runs automatically
+
+#### CORE ORCHESTRATION GAPS
+1. **Manual orchestration** - Requires clicking "Run Agent" button each turn
+2. **No automatic turn progression** - Should auto-run when negotiation is created and after each response
+3. **No "waiting for counterparty" indicator** - UI doesn't show live processing state
+4. **No streaming to feed** - Status updates don't appear in real-time feed
+5. **Current price not animated** - Static display instead of live updating
+
+#### UNIFIED FEED GAPS
+1. **Feed not reusable** - Home feed, listing feed, negotiation feed are not the same component
+2. **No prompt filtering** - Can't filter to show only "needs input" events
+3. **No hero thumbnail in feed** - Listing image not shown alongside events
+4. **Events not linked to SSE** - New events don't stream in real-time
+
+---
+
+## MILESTONE 6: Unified Feed Component [TODO]
+**Status: NOT STARTED**
+**Priority: HIGH**
+
+### 6.1 Create Reusable EventFeed Component
+- [ ] Extract feed logic into `src/components/feed/event-feed.tsx`
+- [ ] Support filter props: `listing_id`, `negotiation_id`, `user_id`, `types[]`
+- [ ] Add "prompt required" filter toggle (shows only human_input_required)
+- [ ] Include hero thumbnail for listing-context events
+- [ ] Add SSE subscription for real-time updates
+
+### 6.2 Integrate Feed Across Pages
+- [ ] Replace Home page feed with EventFeed component
+- [ ] Add EventFeed to Listing detail page (filtered by listing_id)
+- [ ] Add EventFeed to Arena negotiation page (filtered by negotiation_id)
+- [ ] Add compact EventFeed to Buy page sidebar
+
+### 6.3 Event Enhancements
+- [ ] Add new event types: `agent_processing`, `waiting_for_counterparty`
+- [ ] Create events API SSE endpoint: GET /api/events/stream
+- [ ] Link events to negotiations for filtering
+- [ ] Add "whose turn" indicator in event cards
+
+---
+
+## MILESTONE 7: Automatic Orchestrator [TODO]
+**Status: NOT STARTED**
+**Priority: HIGH**
+
+### 7.1 Auto-Start on Negotiation Creation
+- [ ] Modify POST /api/negotiations to trigger first buyer agent step
+- [ ] Create orchestration queue/job system
+- [ ] Add `is_processing` flag to negotiation to prevent duplicate runs
+- [ ] Emit `negotiation_started` event with initial context
+
+### 7.2 Auto-Continue After Each Turn
+- [ ] After buyer agent responds, auto-trigger seller agent
+- [ ] After seller agent responds, auto-trigger buyer agent
+- [ ] Pause auto-run when `ball === 'human'`
+- [ ] Resume auto-run after human response submitted
+- [ ] Add configurable delay between turns (500ms-2s for dramatic effect)
+
+### 7.3 Stream Status to Feed
+- [ ] Emit events during orchestration: `agent_processing`, `buyer_proposes`, etc.
+- [ ] Connect orchestrator to SSE broadcaster
+- [ ] Update negotiation state in real-time via SSE
+- [ ] Show "Spinning hourglass" while agent is processing
+
+### 7.4 Error Handling & Recovery
+- [ ] Handle Gemini API failures gracefully
+- [ ] Retry logic with exponential backoff
+- [ ] Manual "Resume" button if auto-orchestration stalls
+- [ ] Timeout detection (agent taking too long)
+
+---
+
+## MILESTONE 8: Enhanced Negotiation UX [TODO]
+**Status: NOT STARTED**
+**Priority: MEDIUM**
+
+### 8.1 Listing Page Negotiation View
+- [ ] Query negotiations for the listing (all counterparties)
+- [ ] Show active negotiation summary cards
+- [ ] Add "View in Arena" link for each negotiation
+- [ ] Show pending prompts with quick-answer buttons
+- [ ] Display negotiation status timeline
+
+### 8.2 "Whose Turn" Indicators
+- [ ] Add pulsing indicator for active side (buyer/seller)
+- [ ] "Waiting for Buyer..." / "Waiting for Seller..." text
+- [ ] Countdown timer visualization (optional)
+- [ ] Sound notification on turn change (optional)
+
+### 8.3 Price Animation
+- [ ] Animate current price changes in Offer Ladder
+- [ ] Add price history sparkline chart
+- [ ] Show price delta badges (+$50 / -$25)
+- [ ] Highlight when prices are converging
+
+### 8.4 Hero Thumbnail in Status Rail
+- [ ] Show listing image in arena status rail header
+- [ ] Quick listing info (title, category, ask price)
+- [ ] Link to full listing page
+
+---
+
+## MILESTONE 9: Buy Agent Auto-Search [TODO]
+**Status: NOT STARTED**
+**Priority: MEDIUM**
+
+### 9.1 Buy Agent Active State
+- [ ] Add `status` field to buy_agents: 'active' | 'paused' | 'stopped'
+- [ ] Active agents auto-run finder periodically
+- [ ] Pause/Resume toggle in buy agent card
+- [ ] Stop permanently deletes or archives agent
+
+### 9.2 Auto-Search on Open
+- [ ] When selecting a buy agent in /buy page, auto-run finder
+- [ ] Show "Searching..." state with spinner
+- [ ] Debounce to prevent multiple simultaneous searches
+- [ ] Cache results for 5 minutes to reduce API calls
+
+### 9.3 Negotiate Button Creates Negotiation
+- [ ] Fix handleNegotiate to call POST /api/negotiations
+- [ ] Navigate to /arena/[negotiation_id] after creation
+- [ ] Auto-start orchestration (triggers first buyer move)
+- [ ] Update match status to 'negotiating' atomically
+
+---
+
+## MILESTONE 10: Seller Dashboard [TODO]
+**Status: NOT STARTED**
+**Priority: LOW**
+
+### 10.1 My Listings Page Enhancement
+- [ ] Show negotiation count per listing
+- [ ] Filter: active negotiations, needs input, completed
+- [ ] Quick actions: view in arena, answer prompts
+
+### 10.2 Seller Notifications
+- [ ] Badge on sidebar when seller has pending prompts
+- [ ] Email notifications for new negotiations (optional)
+- [ ] Push notifications via web push API (optional)
+
+---
+
+## Implementation Order (Priority)
+
+1. **MILESTONE 7.1-7.2**: Auto-orchestration (core missing feature)
+2. **MILESTONE 9.3**: Negotiate button creates negotiation (broken flow)
+3. **MILESTONE 6.1-6.2**: Unified feed component (enables filtering)
+4. **MILESTONE 7.3**: Stream status to feed (real-time feel)
+5. **MILESTONE 8.1**: Listing page negotiation view
+6. **MILESTONE 8.2**: Whose turn indicators
+7. **MILESTONE 9.1-9.2**: Buy agent auto-search
+8. **MILESTONE 8.3-8.4**: Polish (price animation, thumbnails)
+9. **MILESTONE 10**: Seller dashboard (nice to have)
+
+---
