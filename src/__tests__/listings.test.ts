@@ -18,6 +18,7 @@ const mockListing: Listing = {
   haggling_ammo: ['Good leather quality', 'Minor cosmetic issues only'],
   image_urls: ['https://example.com/img1.jpg'],
   hero_image_url: null,
+  hero_thumbnail_url: null,
   status: 'active',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

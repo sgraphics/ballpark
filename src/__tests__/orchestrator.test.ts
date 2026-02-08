@@ -16,6 +16,7 @@ const makeListing = (overrides?: Partial<Listing>): Listing => ({
   haggling_ammo: ['Original packaging included', 'Receipt available'],
   image_urls: ['https://example.com/image1.jpg'],
   hero_image_url: null,
+  hero_thumbnail_url: null,
   status: 'negotiating',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

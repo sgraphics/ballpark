@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, Tag } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice, getStateBadge, getStateLabel } from '@/lib/utils';
@@ -21,7 +21,7 @@ function getPlaceholder(id: string): string {
 
 export function ListingCard({ listing }: { listing: Listing }) {
   const cat = getCategoryById(listing.category);
-  const imgSrc = listing.hero_image_url || listing.image_urls?.[0] || getPlaceholder(listing.id);
+  const imgSrc = listing.hero_thumbnail_url || listing.hero_image_url || listing.image_urls?.[0] || getPlaceholder(listing.id);
   const badge = getStateBadge(listing.status);
   const conditionField = listing.structured?.condition as string | undefined;
 

@@ -155,6 +155,10 @@ export function generateHeroPath(listingId: string): string {
   return `hero/${listingId}.png`;
 }
 
+export function generateThumbnailPath(listingId: string): string {
+  return `hero/${listingId}_thumb.webp`;
+}
+
 export async function uploadBase64Image(
   base64Data: string,
   objectPath: string,

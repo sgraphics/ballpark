@@ -57,8 +57,6 @@ export async function POST(req: NextRequest) {
     const authUserId = await getUserIdFromRequest(req);
     const body = await req.json();
     const {
-      user_id,
-      seller_user_id,
       title,
       description,
       category,
@@ -68,6 +66,7 @@ export async function POST(req: NextRequest) {
       haggling_ammo,
       image_urls,
       hero_image_url,
+      hero_thumbnail_url,
     } = body;
 
     if (!title || !category || !ask_price) {
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const finalUserId = authUserId || user_id || seller_user_id || null;
+    const finalUserId = authUserId || null;
 
     const formatArray = (arr: string[] | undefined) =>
       arr?.length ? `{${arr.map((u: string) => `"${u}"`).join(',')}}` : '{}';
@@ -85,8 +84,8 @@ export async function POST(req: NextRequest) {
     const result = await query<Listing>(
       `INSERT INTO listings (
         seller_user_id, title, description, category, structured,
-        ask_price, condition_notes, haggling_ammo, image_urls, hero_image_url, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')
+        ask_price, condition_notes, haggling_ammo, image_urls, hero_image_url, hero_thumbnail_url, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active')
       RETURNING *`,
       [
         finalUserId,
@@ -99,6 +98,7 @@ export async function POST(req: NextRequest) {
         formatArray(haggling_ammo),
         formatArray(image_urls),
         hero_image_url || null,
+        hero_thumbnail_url || null,
       ]
     );
 

@@ -14,6 +14,7 @@ const makeListing = (overrides?: Partial<Listing>): Listing => ({
   haggling_ammo: [],
   image_urls: [],
   hero_image_url: null,
+  hero_thumbnail_url: null,
   status: 'active',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

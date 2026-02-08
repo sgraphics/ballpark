@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { generateHeroImage, isGeminiConfigured } from '@/lib/gemini';
-import { uploadBase64Image, generateHeroPath, isGcsConfigured, getPublicUrl } from '@/lib/gcs';
+import { uploadBase64Image, generateHeroPath, generateThumbnailPath, isGcsConfigured } from '@/lib/gcs';
+
+async function createThumbnail(base64Data: string): Promise<string> {
+  const buffer = Buffer.from(base64Data, 'base64');
+  const thumbnailBuffer = await sharp(buffer)
+    .resize(400, 300, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toBuffer();
+  return thumbnailBuffer.toString('base64');
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +23,7 @@ export async function POST(req: NextRequest) {
     if (!isGeminiConfigured()) {
       return NextResponse.json({
         heroUrl: null,
+        thumbnailUrl: null,
         demo: true,
         message: 'Gemini not configured',
       });
@@ -26,6 +37,7 @@ export async function POST(req: NextRequest) {
     if (!isGcsConfigured()) {
       return NextResponse.json({
         heroUrl: null,
+        thumbnailUrl: null,
         heroBase64: heroResult.base64,
         mimeType: heroResult.mimeType,
         demo: true,
@@ -33,16 +45,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const objectPath = generateHeroPath(listingId || crypto.randomUUID());
-    const publicUrl = await uploadBase64Image(
-      heroResult.base64,
-      objectPath,
-      heroResult.mimeType
-    );
+    const id = listingId || crypto.randomUUID();
+    const heroPath = generateHeroPath(id);
+    const thumbnailPath = generateThumbnailPath(id);
+
+    const thumbnailBase64 = await createThumbnail(heroResult.base64);
+
+    const [heroUrl, thumbnailUrl] = await Promise.all([
+      uploadBase64Image(heroResult.base64, heroPath, heroResult.mimeType),
+      uploadBase64Image(thumbnailBase64, thumbnailPath, 'image/webp'),
+    ]);
 
     return NextResponse.json({
-      heroUrl: publicUrl,
-      objectPath,
+      heroUrl,
+      thumbnailUrl,
+      heroPath,
+      thumbnailPath,
     });
   } catch (err) {
     console.error('Hero generation failed:', err);

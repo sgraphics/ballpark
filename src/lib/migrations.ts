@@ -196,6 +196,36 @@ const migrations: Migration[] = [
       END $$;
     `,
   },
+  {
+    id: '013',
+    name: 'add_hero_thumbnail_url',
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'listings' AND column_name = 'hero_thumbnail_url'
+        ) THEN
+          ALTER TABLE listings ADD COLUMN hero_thumbnail_url TEXT;
+        END IF;
+      END $$;
+    `,
+  },
+  {
+    id: '014',
+    name: 'make_seller_user_id_nullable',
+    sql: `
+      DO $$
+      BEGIN
+        ALTER TABLE listings ALTER COLUMN seller_user_id DROP NOT NULL;
+        ALTER TABLE listings DROP CONSTRAINT IF EXISTS listings_seller_user_id_fkey;
+        ALTER TABLE listings ADD CONSTRAINT listings_seller_user_id_fkey
+          FOREIGN KEY (seller_user_id) REFERENCES users(id) ON DELETE SET NULL;
+      EXCEPTION WHEN others THEN
+        NULL;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations(): Promise<{ applied: string[]; skipped: string[] }> {

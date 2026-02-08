@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   try {
     const authUserId = await getUserIdFromRequest(req);
     const body = await req.json();
-    const { user_id, listing_id, name, min_price, urgency, preferences } = body;
+    const { listing_id, name, min_price, urgency, preferences } = body;
 
     if (!listing_id || !name) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const finalUserId = authUserId || user_id || null;
+    const finalUserId = authUserId || null;
 
     const result = await query<SellAgent>(
       `INSERT INTO sell_agents (user_id, listing_id, name, min_price, urgency, preferences)

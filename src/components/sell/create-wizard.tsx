@@ -25,7 +25,7 @@ interface CreateWizardProps {
 }
 
 export function CreateWizard({ onComplete }: CreateWizardProps) {
-  const { fetchWithAuth, userId, authenticated } = useAuth();
+  const { fetchWithAuth, authenticated } = useAuth();
   const [step, setStep] = useState(0);
   const [images, setImages] = useState<ImageFile[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -33,6 +33,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
   const [isDemo, setIsDemo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [heroThumbnailUrl, setHeroThumbnailUrl] = useState<string | null>(null);
   const [heroGenerating, setHeroGenerating] = useState(false);
   const [formData, setFormData] = useState<ListingFormData>({
     title: '',
@@ -80,6 +81,9 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         } else if (data.heroBase64) {
           setHeroImageUrl(`data:${data.mimeType};base64,${data.heroBase64}`);
         }
+        if (data.thumbnailUrl) {
+          setHeroThumbnailUrl(data.thumbnailUrl);
+        }
       })
       .catch((err) => {
         console.error('Hero generation failed:', err);
@@ -125,7 +129,6 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
       );
 
       const listingPayload = {
-        user_id: userId,
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -135,6 +138,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         haggling_ammo: analysis?.haggling_ammo || [],
         image_urls: imageUrls,
         hero_image_url: heroImageUrl?.startsWith('data:') ? null : heroImageUrl,
+        hero_thumbnail_url: heroThumbnailUrl,
       };
 
       const listingRes = authenticated
@@ -155,7 +159,6 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
       const listing = listingData.listing;
 
       const agentPayload = {
-        user_id: userId,
         listing_id: listing.id,
         name: formData.agent_name || `Agent: ${formData.title}`,
         min_price: parseFloat(formData.min_price) || 0,

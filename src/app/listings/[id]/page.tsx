@@ -40,6 +40,7 @@ const DEMO_LISTING: Listing = {
     'https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=800',
   ],
   hero_image_url: null,
+  hero_thumbnail_url: null,
   status: 'active',
   created_at: new Date(Date.now() - 86400000).toISOString(),
   updated_at: new Date(Date.now() - 86400000).toISOString(),

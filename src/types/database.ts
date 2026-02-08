@@ -24,6 +24,7 @@ export interface Listing {
   haggling_ammo: string[];
   image_urls: string[];
   hero_image_url: string | null;
+  hero_thumbnail_url: string | null;
   status: ListingStatus;
   created_at: string;
   updated_at: string;
