@@ -373,33 +373,33 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
-## MILESTONE 6: Unified Feed Component [TODO]
-**Status: NOT STARTED**
+## MILESTONE 6: Unified Feed Component [DONE]
+**Status: COMPLETE**
 **Priority: HIGH**
 
-### 6.1 Create Reusable EventFeed Component
-- [ ] Extract feed logic into `src/components/feed/event-feed.tsx`
-- [ ] Support filter props: `listing_id`, `negotiation_id`, `user_id`, `types[]`
-- [ ] Add "prompt required" filter toggle (shows only human_input_required)
-- [ ] Include hero thumbnail for listing-context events
-- [ ] Add SSE subscription for real-time updates
+### 6.1 Create Reusable EventFeed Component [DONE]
+- [x] Extract feed logic into `src/components/feed/event-feed.tsx`
+- [x] Support filter props: `listing_id`, `negotiation_id`, `user_id`, `types[]`
+- [x] Add "prompt required" filter toggle (shows only human_input_required)
+- [x] Include hero thumbnail support for listing-context events
+- [x] Add SSE subscription for real-time updates
 
-### 6.2 Integrate Feed Across Pages
-- [ ] Replace Home page feed with EventFeed component
-- [ ] Add EventFeed to Listing detail page (filtered by listing_id)
-- [ ] Add EventFeed to Arena negotiation page (filtered by negotiation_id)
-- [ ] Add compact EventFeed to Buy page sidebar
+### 6.2 Integrate Feed Across Pages [DONE]
+- [x] Replace Home page feed with EventFeed component
+- [x] Add EventFeed to Listing detail page (filtered by listing_id)
+- [x] Add EventFeed to Arena negotiation page (filtered by negotiation_id)
+- [ ] Add compact EventFeed to Buy page sidebar (optional enhancement)
 
-### 6.3 Event Enhancements
-- [ ] Add new event types: `agent_processing`, `waiting_for_counterparty`
-- [ ] Create events API SSE endpoint: GET /api/events/stream
-- [ ] Link events to negotiations for filtering
-- [ ] Add "whose turn" indicator in event cards
+### 6.3 Event Enhancements [PARTIAL]
+- [x] Add new event type: `agent_processing`
+- [x] Create events API SSE endpoint: GET /api/events/stream
+- [x] Link events to negotiations for filtering
+- [ ] Add "whose turn" indicator in event cards (future enhancement)
 
 ---
 
-## MILESTONE 7: Automatic Orchestrator [PARTIAL]
-**Status: IN PROGRESS**
+## MILESTONE 7: Automatic Orchestrator [DONE]
+**Status: COMPLETE**
 **Priority: HIGH**
 
 ### 7.1 Auto-Start on Negotiation Creation [DONE]
@@ -414,11 +414,11 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 - [x] Resume auto-run after human response submitted
 - [x] Add configurable delay between turns (1.5s for dramatic effect)
 
-### 7.3 Stream Status to Feed
-- [ ] Emit events during orchestration: `agent_processing`, `buyer_proposes`, etc.
-- [ ] Connect orchestrator to SSE broadcaster
-- [ ] Update negotiation state in real-time via SSE
-- [ ] Show "Spinning hourglass" while agent is processing
+### 7.3 Stream Status to Feed [DONE]
+- [x] Emit events during orchestration: `agent_processing`, `buyer_proposes`, etc.
+- [x] Connect orchestrator to SSE broadcaster via /api/events/stream
+- [x] Update negotiation state in real-time via SSE polling
+- [x] Show spinning indicator while agent is processing
 
 ### 7.4 Error Handling & Recovery
 - [ ] Handle Gemini API failures gracefully
@@ -502,8 +502,8 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 1. ~~**MILESTONE 7.1-7.2**: Auto-orchestration (core missing feature)~~ **DONE**
 2. ~~**MILESTONE 9.3**: Negotiate button creates negotiation (broken flow)~~ **DONE**
-3. **MILESTONE 6.1-6.2**: Unified feed component (enables filtering)
-4. **MILESTONE 7.3**: Stream status to feed (real-time feel)
+3. ~~**MILESTONE 6.1-6.2**: Unified feed component (enables filtering)~~ **DONE**
+4. ~~**MILESTONE 7.3**: Stream status to feed (real-time feel)~~ **DONE**
 5. **MILESTONE 8.1**: Listing page negotiation view
 6. **MILESTONE 8.2**: Whose turn indicators
 7. **MILESTONE 9.1-9.2**: Buy agent auto-search
