@@ -1,59 +1,6 @@
 # Ballpark - Agentic Marketplace TODO
 
-## IMPORTANT: Git Workflow (Required Until Bolt Build Issue Fixed)
 
-**Why we commit to git:**
-Bolt.new has a current build issue where the build process wipes the working directory. To preserve changes, ALL modifications MUST be committed and pushed to GitHub BEFORE running the build.
-
-**GitHub Repository:**
-- Origin: `https://github.com/sgraphics/ballpark`
-- Branch: `main`
-
-**GitHub PAT Token:**
-```
-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
-```
-
-**Workflow for ANY Change (MUST FOLLOW EXACTLY):**
-
-1. **PULL FIRST** - Always pull latest changes before starting:
-   ```bash
-   git pull origin main
-   ```
-
-2. **Implement changes** - Make code changes and write/update tests
-
-3. **Quality checks** - Verify code quality:
-   ```bash
-   npx tsc --noEmit  # Check TypeScript
-   npm run lint       # Run linter (if configured)
-   ```
-
-4. **COMMIT** - Add and commit with scoped message:
-   ```bash
-   git add -A
-   git commit -m "feat: description of changes"
-   ```
-
-5. **PUSH** - Push to GitHub using PAT:
-   ```bash
-   git push https://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@github.com/sgraphics/ballpark.git main
-   ```
-
-6. **Summary** - Provide brief summary of what was changed
-
-7. **BUILD** - User or bolt.new will handle building - DO NOT run build commands
-
-**CRITICAL RULES:**
-- ❌ NEVER run `git init` - this wipes ALL commit history
-- ❌ NEVER force push without pulling first
-- ❌ NEVER reset or rebase - preserve all commit history
-- ✅ ALWAYS pull before starting work
-- ✅ DO NOT worry about building - that's handled separately
-
-This workflow is confirmed with bolt.new helpdesk and is the official workaround until the build issue is resolved.
-
----
 
 ## Project Overview
 An agentic marketplace where AI buyer/seller agents negotiate on behalf of users, with escrow-backed transactions.
@@ -428,8 +375,8 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
-## MILESTONE 8: Enhanced Negotiation UX [PARTIAL]
-**Status: 8.1-8.2 COMPLETE, 8.3-8.4 TODO**
+## MILESTONE 8: Enhanced Negotiation UX [DONE]
+**Status: COMPLETE**
 **Priority: MEDIUM**
 
 ### 8.1 Listing Page Negotiation View [DONE]
@@ -446,16 +393,16 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 - [x] TurnBadge compact component for cards
 - [x] Integrated into Arena page header and NegotiationCard
 
-### 8.3 Price Animation
-- [ ] Animate current price changes in Offer Ladder
-- [ ] Add price history sparkline chart
-- [ ] Show price delta badges (+$50 / -$25)
-- [ ] Highlight when prices are converging
+### 8.3 Price Animation [DONE]
+- [x] Animate current price changes in Offer Ladder (AnimatedPrice component with eased counter)
+- [x] Add price history sparkline chart (PriceSparkline SVG component with buyer/seller lines)
+- [x] Show price delta badges (+$50 / -$25) (PriceDeltaBadge component)
+- [x] Highlight when prices are converging (convergence indicator with gap %, glow effect)
 
-### 8.4 Hero Thumbnail in Status Rail
-- [ ] Show listing image in arena status rail header
-- [ ] Quick listing info (title, category, ask price)
-- [ ] Link to full listing page
+### 8.4 Hero Thumbnail in Status Rail [DONE]
+- [x] Show listing image in arena status rail header (HeroThumbnail component)
+- [x] Quick listing info (title, category, ask price)
+- [x] Link to full listing page
 
 ---
 

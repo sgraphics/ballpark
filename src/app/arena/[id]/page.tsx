@@ -280,7 +280,7 @@ export default function ArenaPage({ params }: ArenaPageProps) {
             </div>
           </div>
           <div className="col-span-5">
-            <StatusRail messages={messages} />
+            <StatusRail messages={messages} listing={listing} />
           </div>
           <div className="col-span-4">
             <Card dark>

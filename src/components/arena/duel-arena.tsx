@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Bot, Zap, ArrowRight, Clock, DollarSign, Target, TrendingDown, TrendingUp, Loader2, Activity, Shield, Crosshair, Radio } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice, formatRelativeTime } from '@/lib/utils';
+import { PriceSparkline } from '@/components/arena/price-sparkline';
+import { AnimatedPrice, PriceDeltaBadge } from '@/components/arena/animated-price';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage, BallOwner } from '@/types/database';
 
 interface DuelArenaProps {
@@ -200,70 +202,126 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
     );
   }
 
+  // Build lookup of previous offer by same side for delta calculation
+  const previousBySide = (index: number, side: 'buyer' | 'seller'): OfferCard | null => {
+    // offers are in reverse chronological order (newest first),
+    // so "previous by same side" means looking forward in the array
+    for (let i = index + 1; i < offers.length; i++) {
+      if (offers[i].side === side) return offers[i];
+    }
+    return null;
+  };
+
+  // Detect convergence: are buyer and seller prices getting closer?
+  const lastBuyer = offers.find(o => o.side === 'buyer');
+  const lastSeller = offers.find(o => o.side === 'seller');
+  const currentGap = lastBuyer && lastSeller ? Math.abs(lastSeller.price - lastBuyer.price) : null;
+  const gapPercent = lastBuyer && lastSeller && lastSeller.price > 0
+    ? Math.round((Math.abs(lastSeller.price - lastBuyer.price) / lastSeller.price) * 100)
+    : null;
+
   return (
-    <div className="space-y-2 max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
-      {offers.map((offer, i) => {
-        const isBuyer = offer.side === 'buyer';
-        const isLatest = i === 0;
-        const isAgreed = agreedPrice !== null && offer.price === agreedPrice && isLatest;
+    <div className="space-y-3">
+      {/* Convergence indicator */}
+      {currentGap !== null && gapPercent !== null && (
+        <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border transition-all duration-500 ${
+          gapPercent <= 5
+            ? 'bg-emerald-500/10 border-emerald-500/30 animate-glow-pulse-emerald'
+            : gapPercent <= 15
+              ? 'bg-yellow-500/10 border-yellow-500/20'
+              : 'bg-zinc-900/50 border-zinc-800/50'
+        }`}>
+          <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              gapPercent <= 5 ? 'bg-emerald-400 animate-pulse' : gapPercent <= 15 ? 'bg-yellow-400' : 'bg-zinc-600'
+            }`} />
+            <span className="text-[9px] uppercase tracking-wider text-zinc-500">Gap</span>
+          </div>
+          <span className={`text-xs font-mono font-medium ${
+            gapPercent <= 5 ? 'text-emerald-400' : gapPercent <= 15 ? 'text-yellow-400' : 'text-zinc-400'
+          }`}>
+            {formatPrice(currentGap)} ({gapPercent}%)
+          </span>
+        </div>
+      )}
 
-        return (
-          <div
-            key={i}
-            className={`relative flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-              isAgreed
-                ? 'bg-emerald-500/20 border border-emerald-500/50'
-                : isLatest
-                  ? isBuyer ? 'bg-cyan-500/10 border border-cyan-500/30' : 'bg-orange-500/10 border border-orange-500/30'
-                  : 'bg-zinc-900/50 border border-zinc-800/50'
-            }`}
-            style={{ animationDelay: `${i * 50}ms` }}
-          >
-            {isLatest && !isAgreed && (
-              <div className="absolute inset-0 rounded-lg overflow-hidden">
-                <div className={`absolute inset-0 ${isBuyer ? 'bg-cyan-500/5' : 'bg-orange-500/5'} animate-pulse`} />
-              </div>
-            )}
+      {/* Offer list */}
+      <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
+        {offers.map((offer, i) => {
+          const isBuyer = offer.side === 'buyer';
+          const isLatest = i === 0;
+          const isAgreed = agreedPrice !== null && offer.price === agreedPrice && isLatest;
+          const prev = previousBySide(i, offer.side);
 
-            <div className={`relative z-10 w-8 h-8 rounded-lg flex items-center justify-center ${
-              isAgreed
-                ? 'bg-emerald-500/20'
-                : isBuyer ? 'bg-cyan-500/20' : 'bg-orange-500/20'
-            }`}>
-              {isAgreed ? (
-                <Target className="w-4 h-4 text-emerald-400" />
-              ) : isBuyer ? (
-                <TrendingUp className="w-4 h-4 text-cyan-400" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-orange-400" />
+          return (
+            <div
+              key={i}
+              className={`relative flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                isAgreed
+                  ? 'bg-emerald-500/20 border border-emerald-500/50'
+                  : isLatest
+                    ? isBuyer ? 'bg-cyan-500/10 border border-cyan-500/30' : 'bg-orange-500/10 border border-orange-500/30'
+                    : 'bg-zinc-900/50 border border-zinc-800/50'
+              } ${isLatest ? 'animate-slide-in-offer' : ''}`}
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              {isLatest && !isAgreed && (
+                <div className="absolute inset-0 rounded-lg overflow-hidden">
+                  <div className={`absolute inset-0 ${isBuyer ? 'bg-cyan-500/5' : 'bg-orange-500/5'} animate-pulse`} />
+                </div>
               )}
-            </div>
 
-            <div className="relative z-10 flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <p className={`text-lg font-heading font-medium ${
-                  isAgreed ? 'text-emerald-400' : 'text-white'
-                }`}>
-                  {formatPrice(offer.price)}
-                </p>
-                {isAgreed && (
-                  <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-medium animate-pulse">
-                    DEAL LOCKED
-                  </span>
+              <div className={`relative z-10 w-8 h-8 rounded-lg flex items-center justify-center ${
+                isAgreed
+                  ? 'bg-emerald-500/20'
+                  : isBuyer ? 'bg-cyan-500/20' : 'bg-orange-500/20'
+              }`}>
+                {isAgreed ? (
+                  <Target className="w-4 h-4 text-emerald-400" />
+                ) : isBuyer ? (
+                  <TrendingUp className="w-4 h-4 text-cyan-400" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-orange-400" />
                 )}
               </div>
-              <p className="text-[10px] text-zinc-500 truncate">{offer.statusMessage}</p>
-            </div>
 
-            <div className="relative z-10 text-right">
-              <span className={`text-[10px] font-medium ${isBuyer ? 'text-cyan-400' : 'text-orange-400'}`}>
-                {isBuyer ? 'BUY' : 'SELL'}
-              </span>
-              <p className="text-[9px] text-zinc-600">{formatRelativeTime(offer.timestamp)}</p>
+              <div className="relative z-10 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className={`text-lg font-heading font-medium ${
+                    isAgreed ? 'text-emerald-400' : 'text-white'
+                  }`}>
+                    {isLatest ? (
+                      <AnimatedPrice value={offer.price} className={isAgreed ? 'text-emerald-400' : 'text-white'} />
+                    ) : (
+                      formatPrice(offer.price)
+                    )}
+                  </p>
+                  {isAgreed && (
+                    <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-medium animate-pulse">
+                      DEAL LOCKED
+                    </span>
+                  )}
+                  {!isAgreed && prev && (
+                    <PriceDeltaBadge
+                      currentPrice={offer.price}
+                      previousPrice={prev.price}
+                      side={offer.side}
+                    />
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-500 truncate">{offer.statusMessage}</p>
+              </div>
+
+              <div className="relative z-10 text-right">
+                <span className={`text-[10px] font-medium ${isBuyer ? 'text-cyan-400' : 'text-orange-400'}`}>
+                  {isBuyer ? 'BUY' : 'SELL'}
+                </span>
+                <p className="text-[9px] text-zinc-600">{formatRelativeTime(offer.timestamp)}</p>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -491,6 +549,19 @@ export function DuelArena({
               <div className="flex-1 min-h-0">
                 <OfferLadder offers={offers} agreedPrice={negotiation.agreed_price} />
               </div>
+
+              {/* Price History Sparkline */}
+              {offers.length >= 2 && (
+                <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                  <PriceSparkline
+                    offers={offers.slice().reverse().map(o => ({
+                      price: o.price,
+                      side: o.side,
+                      timestamp: o.timestamp,
+                    }))}
+                  />
+                </div>
+              )}
 
               <div className="mt-4 pt-4 border-t border-zinc-800/50">
                 <BallIndicator

@@ -1,0 +1,248 @@
+Build a production-quality hackathon MVP web app called “Ballpark” (domain: ballpark.to).
+This is NOT a chatbot UI. It is a card/state/agent orchestration system with a “duel arena” centerpiece.
+
+
+INITIAL NOTES (For reference)
+Its important to note also that I want to use my own postgres, not expensive supabase. It should use Privy so we get instant wallet for users - used in escrow/auction contracts.I will use Toolblox to craete the contract so for the sake of the app it needs to just use a contract with methods "create(id of item, price, buyer address)" which sets the caller as seller. Then buyer "deposit()" and then buyer "confirm()" to confirm receipt that pays out the deposit. For hackathon its more than enough i think - actually it will also do timed release/confirm, and needs to have flag() in case of issue (then admin needs to set updatePrice(new price) so it becomes the new price and rest is returned to buyer.Lets keep it really clear, super organized, and needs to have WOW factor that gemini/google/deepmind is looking. Images lets upload to google cloud storage. App will later need to run in Vercel. AI should prepare a connection string to postgres where it should run migrations automatically if not yet run. Need table to track run migs. prefer ethers over viem, but honestly whatever is privy best practce ... use that. As for the actual logic: we need home screen with list of proucts, can filter by category and category dependent filters (size). Also separate sections by agent showing for each, potential matches, questions, signature requests and ongoing negotiations. Buttons New sell agent, New Buy agent. Sell agent allows simple upload of photos, where AI detects faults for all parties to use in haggling, name, category, category specific data, freetext description and price. Buy agent just starts with current search filter and user can add in freetext the AI search and characteristics prompt. Finder ai should (after every 30 mins) get all products matching criteria (json), and output products that match to potential_matches if they are not yet potential matches. User can then mark these as "negotiate". When clicking on any item, it shows images, and details and status-related info. For example if its ongoing negotiation, it should show current facts like "Bringing out rust", "Asking about returns" and "Refusing to counter" etc. Different color for each side. When clicking on each status message should see the raw message by the buyer/seller AI. This status message screen should always be visible even if there is a pending offer on the table . Each item should have a orchestration. a turn logic. When a result is pushed to orchestrator service. Orchestrator pushes the info (context, item, message history,+ new message) to gemini buyer or seller bot. The result should contain answer, status_message, price_proposal (nullable), user_prompt (buy agent can only prompt buyer, sell agent the seller). The orchestrator websocket should be bindable (only for buyer or seller user). And the updates should flow to item ui and UI should update statuses, and status related UI automatically. Itnteractive, live feeling. When price is agreed by both, then Overall website should be minimal, white, with black areas for some information. Poppins Light font for headings, inter for text.
+
+STACK (MUST)
+- Next.js 14 (App Router), TypeScript
+- TailwindCSS for styling
+- Postgres (user-managed, NOT Supabase). Use node-postgres (pg) or Prisma (your choice). Must run migrations automatically.
+- Privy for auth + embedded wallet creation (every user gets a wallet).
+- ethers for contract calls
+- Google Cloud Storage (GCS) for image uploads via signed URLs
+- Gemini API for agent orchestration (server-side)
+- Realtime updates: use WebSocket (or Server-Sent Events if faster) to push orchestration status to the UI.
+
+DEPLOYMENT
+- Must be easy to deploy on Vercel later.
+- All secrets via environment variables.
+
+PRIMARY GOAL
+Deliver an end-to-end working prototype in under 3 minutes:
+1) create listing (seller)
+2) buyer creates buy agent
+3) agents negotiate in “duel arena” (structured, turn-based)
+4) agree price → buyer deposits to escrow contract → buyer confirms → payout
+5) flag flow: buyer can flag; admin can updatePrice(newPrice) to resolve, returning difference to buyer
+
+UI STYLE (MUST)
+- Minimal, white, sci-fi, Polymarket-like
+- No gradients, no skeuomorphism
+- Cards > chat bubbles
+- Poppins (light) for headings, Inter for body
+- Use subtle black/near-black panels for “arena” and “status rail”
+- Everything should feel live and reactive.
+
+CRITICAL RULES
+- AI must NEVER invent category-specific fields (sizes, years, storage, etc).
+- Human must explicitly choose category + category-specific structured fields.
+- AI can: describe, summarize, detect potential issues from images, propose negotiation strategy, draft messages.
+- AI must label uncertain observations with confidence (high/med/low) and always ask if missing required structured fields.
+
+APP INFORMATION ARCHITECTURE (SCREENS)
+A) Home / Feed (default)
+- A grid/list of event cards (not a message thread):
+  - “New listing created”
+  - “Potential match found”
+  - “Buyer agent proposes”
+  - “Seller agent counters”
+  - “Human input requested”
+  - “Deal ready to close”
+  - “Escrow funded”
+  - “Delivery confirmed”
+- Top controls: category filter + category-specific filters (e.g. pants waist/length) + search box
+- Left sidebar (or top tabs):
+  - Products
+  - My Sell Agents
+  - My Buy Agents
+  - Arena (global)
+  - Admin (hidden unless ADMIN_WALLET matches)
+
+B) New Sell Agent + Listing flow
+- Step 1: Upload 3–6 photos to GCS (signed URL flow)
+- Step 2: Gemini analyzes images:
+  - suggested title
+  - neutral description
+  - possible category suggestion (non-binding)
+  - “condition notes” with confidence tags (e.g. “Possible rust spots (med)”, “Sole wear (high)”)
+  - “haggling ammo” list: objective faults/issues both sides can reference
+- Step 3: Human confirms:
+  - category
+  - category-specific structured fields (explicit dropdowns/inputs)
+  - price (ask)
+  - free-text description
+- Save listing.
+
+C) New Buy Agent flow
+- User picks category + structured filters
+- Optional free-text “what I’m looking for” prompt
+- Buy agent stores constraints:
+  - max price
+  - preferences
+  - negotiable / non-negotiable notes
+
+D) Listing Detail page
+- Large images + structured facts
+- Right side: persistent “Status Rail” (ALWAYS visible)
+  - status messages stacked as cards, color-coded by side:
+    - Buyer agent (blue-ish border)
+    - Seller agent (orange-ish border)
+    - System (gray)
+    - Human-required (black)
+  - Clicking a status card reveals “raw message” (the exact agent output / tool result)
+- Actions based on state:
+  - “Negotiate” (if user is buyer)
+  - “Accept price” (if user is seller and price proposal exists)
+  - “Deposit to escrow” (buyer, when agreed)
+  - “Confirm delivery” (buyer, after deposit)
+  - “Flag issue” (buyer)
+  - Admin: “Update price” (admin only after flag)
+
+E) The WOW FEATURE: Duel Arena
+- Full-width dark/black panel with 3 columns:
+  LEFT: Seller Agent panel (constraints summary, ask, min price, urgency)
+  CENTER: Offer Ladder (stack of price cards with timestamps) + “Ball in your court” indicator (whose turn)
+  RIGHT: Buyer Agent panel (max price, prefs, urgency)
+- No chat bubbles. Only structured widgets:
+  - current proposal card
+  - concession chips (“+2 days shipping”, “no returns”)
+  - “why” summary (1–2 lines, no chain-of-thought)
+  - next action: “Waiting for Seller”, “Waiting for Buyer”, “Needs Human Answer”
+- The Arena should render for any active negotiation.
+
+BUSINESS LOGIC (MUST IMPLEMENT)
+Entities:
+- Users (Privy user id, wallet address)
+- Listings
+- SellAgents, BuyAgents
+- Negotiations (between a listing and a buy agent)
+- Events feed
+- Escrow records
+- Orchestration messages (history)
+- Migrations table
+
+MATCHING + NEGOTIATION LOOP
+- A “Finder” job runs every 30 minutes (simulate with a manual button in UI + server endpoint; optional cron later):
+  - For each buy agent, query listings by category + structured filters
+  - Use Gemini to rank/decide “good matches” based on listing description + images analysis summary (but never invent missing facts)
+  - Insert into potential_matches table if not exists
+- User can click a potential match and press “Negotiate”
+- Negotiation creates an orchestration thread:
+  - Turn-based: buyer agent -> seller agent -> buyer agent...
+  - Each turn produces a structured JSON result:
+    {
+      "answer": string,                       // a short response to the other side
+      "status_message": string,               // one-line status for UI rail
+      "price_proposal": number | null,        // proposed price
+      "concessions": string[] ,               // optional
+      "user_prompt": {                        // if human input required
+         "target": "buyer" | "seller",
+         "question": string,
+         "choices"?: string[]
+      } | null
+    }
+  - Store full result plus raw model output.
+- Orchestrator service:
+  - API endpoint: POST /api/orchestrate/step with negotiationId
+  - Loads context (listing, structured facts, condition notes, constraints, message history)
+  - Calls Gemini (buyer or seller role) with strict instruction to output valid JSON schema above
+  - Writes message + updates negotiation state
+  - Pushes realtime update to subscribed clients (WS/SSE)
+
+ESCROW CONTRACT INTEGRATION (Toolblox-built contract; treat as given)
+Assume environment variables:
+- ESCROW_CONTRACT_ADDRESS
+- ESCROW_ABI_JSON (string)
+Contract methods:
+- create(itemId, price, buyer)  // caller becomes seller
+- deposit() payable             // buyer deposits agreed price
+- confirm()                     // buyer confirms delivery; releases funds
+- flag()                        // buyer flags issue
+- updatePrice(newPrice)         // admin updates price after flag; refunds buyer difference
+For MVP:
+- Use ethers with Privy embedded wallet provider/signer.
+- On “Deal ready”:
+  - Seller calls create(listingId, agreedPrice, buyerAddress)
+  - Buyer calls deposit({ value: agreedPrice })
+  - Buyer calls confirm()
+  - If flagged: buyer calls flag(); admin uses updatePrice(newPrice)
+
+DATABASE (Postgres) REQUIRED TABLES
+Use Prisma or SQL migrations; but must be automatic.
+Include a table to track applied migrations, e.g. schema_migrations(id, applied_at).
+Minimum tables:
+- users(id, privy_id unique, wallet_address unique, created_at)
+- listings(id uuid, seller_user_id, title, description, category, structured jsonb, ask_price, condition_notes jsonb, image_urls text[], status, created_at)
+- sell_agents(id, user_id, name, defaults jsonb, created_at)
+- buy_agents(id, user_id, name, category, filters jsonb, prompt text, max_price numeric, created_at)
+- matches(id, buy_agent_id, listing_id, score numeric, reason text, status enum('potential','negotiating','dismissed'), created_at)
+- negotiations(id, buy_agent_id, listing_id, state enum('idle','negotiating','agreed','escrow_created','funded','confirmed','flagged','resolved'), agreed_price numeric, ball enum('buyer','seller','human'), created_at, updated_at)
+- messages(id, negotiation_id, role enum('buyer_agent','seller_agent','system','human'), raw text, parsed jsonb, created_at)
+- events(id, user_id nullable, type text, payload jsonb, created_at)
+- escrow(id, negotiation_id, contract_address, tx_create, tx_deposit, tx_confirm, tx_flag, tx_updateprice, created_at)
+
+AUTHZ / SECURITY (MVP-level)
+- Only seller can edit their listings
+- Only buyer (buy agent owner) can start negotiation
+- Only negotiation participants can subscribe to WS/SSE updates
+- Admin wallet from env ADMIN_WALLET can access /admin panel actions
+
+GCS UPLOAD
+- Implement: POST /api/uploads/sign to return signed URL for direct upload
+- Save public URL in listing after upload
+- For MVP you can mark bucket as public-read or return signed GET URL; keep it simple.
+
+GEMINI INTEGRATION
+- Use Gemini 3 API server-side
+- Two system prompts: one for Buyer Agent, one for Seller Agent
+- Must enforce JSON-only output matching schema
+- MUST include explicit rule: never invent structured fields; ask via user_prompt if needed
+- Provide “Thinking level” / “trace” only internally; DO NOT show chain-of-thought; show 1–2 line rationale in status_message.
+
+DEMO DATA
+- Seed a few fake listings and buy agents via a seed script endpoint /api/dev/seed (only if DEV_MODE env set).
+- The app should be usable without login for browsing, but require Privy login to create agents/negotiate/escrow.
+
+DELIVERABLE
+Generate the full codebase, runnable locally:
+- npm install
+- npm run dev
+Include a README with env vars:
+- DATABASE_URL
+- PRIVY_APP_ID, PRIVY_APP_SECRET
+- GEMINI_API_KEY
+- GCS_BUCKET, GCP_PROJECT, GCP_SERVICE_ACCOUNT_JSON (or simpler credentials)
+- ESCROW_CONTRACT_ADDRESS
+- ESCROW_ABI_JSON
+- ADMIN_WALLET
+- DEV_MODE=true/false
+
+IMPORTANT UX DETAILS
+- No chat threads. Status rail + offer ladder.
+- “Ball in your court” indicator for turn logic.
+- Lots of compact cards on screen (Polymarket vibe).
+- Arena must look like a spectacle even with fake data.
+
+as a seller i want to
+
+create a listing (works)
+browse negotions (can be with different users) for this listing on listing page
+listing page should show me a filtered feed of events only for this listing, with all the prompt-types up top so i know what to press, what need input
+browse all my ongoing negotiations in Arena page
+What type of status updates do we have for events?
+
+as a buyer i want to
+
+create buy agent, it should go to state Active, until i stop it
+every time I click on any agent or open one in /buy then it should automatically perform a search. display new matches and allow me to "dismiss" and start negotiation
+then the listing page will show a feed for this negotiation (like for seller, but buyer just has one negotiation for one listing)
+I should see all my negotiations in under Arena and all updates from all nefotiations in Feed
+The Feed and feed on listing page and negotiation page should be the SAME component, just filtered. Showing the prompt ones up top. When the negotiation is active it should look like running thing, with "Spinning hourglass" and "waiting for counterparty" if his turn.
+
+There should be an orchestrator component that manages turns. when a negotiation is created, orchestrator should pass the contet to buyer to output a specific type of return message. This then should be processed (to see what type it is, forfeit, propose price, ask from human, ask from other party, etc) and STREAMED to the feed as status message (not chat message). Then history and db should be updated and sent to buyer AI, if needed. There should be always info "who's turn is it" on the negotation / orchestrator.
+
+the negotiation / battle UX should be really engaging with a nice animation of current price down below, and each status message showing in the feed and the hero thumb on the left along with main info about the listing.
+
+It should be really clear whats going on at any given time.

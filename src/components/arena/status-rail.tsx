@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, User, Bot, Settings, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, User, Bot, Settings, AlertCircle, ExternalLink, Tag } from 'lucide-react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatRelativeTime, formatPrice } from '@/lib/utils';
-import type { NegMessage, ParsedMessage } from '@/types/database';
+import type { NegMessage, ParsedMessage, Listing } from '@/types/database';
 
 interface StatusRailProps {
   messages: NegMessage[];
+  listing?: Listing | null;
   className?: string;
 }
 
@@ -131,11 +133,59 @@ function StatusCard({ message }: StatusCardProps) {
   );
 }
 
-export function StatusRail({ messages, className = '' }: StatusRailProps) {
+function HeroThumbnail({ listing }: { listing: Listing }) {
+  const heroImage = listing.hero_thumbnail_url || listing.hero_image_url || listing.image_urls?.[0];
+
+  return (
+    <div className="mb-4 pb-4 border-b border-bp-border">
+      <div className="flex gap-3">
+        {/* Thumbnail */}
+        {heroImage ? (
+          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+            <img
+              src={heroImage}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-gray-100 flex items-center justify-center">
+            <Tag className="w-6 h-6 text-bp-muted-light" />
+          </div>
+        )}
+
+        {/* Listing info */}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-heading text-sm font-medium text-bp-black truncate">
+            {listing.title}
+          </h4>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant="default" className="text-[10px] px-1.5 py-0">
+              {listing.category}
+            </Badge>
+            <span className="text-xs font-medium text-bp-seller">
+              {formatPrice(listing.ask_price)}
+            </span>
+          </div>
+          <Link
+            href={`/listings/${listing.id}`}
+            className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-bp-buyer hover:text-bp-buyer/80 transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" />
+            <span>View Listing</span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function StatusRail({ messages, listing, className = '' }: StatusRailProps) {
   if (messages.length === 0) {
     return (
       <Card className={`p-4 ${className}`}>
         <h3 className="font-heading text-sm font-medium mb-3">Status Rail</h3>
+        {listing && <HeroThumbnail listing={listing} />}
         <div className="text-center py-8">
           <Bot className="w-8 h-8 text-bp-muted-light mx-auto mb-2" />
           <p className="text-xs text-bp-muted">No messages yet</p>
@@ -153,6 +203,7 @@ export function StatusRail({ messages, className = '' }: StatusRailProps) {
         Status Rail
         <span className="text-bp-muted font-normal ml-2">({messages.length})</span>
       </h3>
+      {listing && <HeroThumbnail listing={listing} />}
       <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
         {[...messages].reverse().map((msg) => (
           <StatusCard key={msg.id} message={msg} />
