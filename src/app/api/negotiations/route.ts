@@ -31,9 +31,27 @@ export async function GET(req: NextRequest) {
       params.push(state);
     }
 
+    const enrich = url.searchParams.get('enrich') === 'true';
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const sql = `SELECT * FROM negotiations ${where} ORDER BY updated_at DESC`;
 
+    if (enrich) {
+      const sql = `
+        SELECT n.*,
+          l.title AS listing_title,
+          l.ask_price AS listing_price,
+          l.hero_thumbnail_url AS listing_hero_thumbnail,
+          l.image_urls AS listing_images,
+          ba.name AS buy_agent_name
+        FROM negotiations n
+        LEFT JOIN listings l ON n.listing_id = l.id
+        LEFT JOIN buy_agents ba ON n.buy_agent_id = ba.id
+        ${where}
+        ORDER BY n.updated_at DESC`;
+      const result = await query<Negotiation>(sql, params);
+      return NextResponse.json({ negotiations: result.rows });
+    }
+
+    const sql = `SELECT * FROM negotiations ${where} ORDER BY updated_at DESC`;
     const result = await query<Negotiation>(sql, params);
     return NextResponse.json({ negotiations: result.rows });
   } catch (err) {

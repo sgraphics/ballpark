@@ -14,6 +14,7 @@ interface EnrichedNegotiation extends Negotiation {
   listing_title?: string;
   listing_price?: number;
   listing_images?: string[];
+  listing_hero_thumbnail?: string | null;
   buy_agent_name?: string;
 }
 
@@ -63,8 +64,9 @@ const DEMO_NEGOTIATIONS: EnrichedNegotiation[] = [
 ];
 
 function NegotiationCard({ negotiation }: { negotiation: EnrichedNegotiation }) {
-  const imageUrl = negotiation.listing_images?.[0] ||
-    'https://images.pexels.com/photos/4439901/pexels-photo-4439901.jpeg?auto=compress&cs=tinysrgb&w=400';
+  const imageUrl = negotiation.listing_hero_thumbnail
+    || negotiation.listing_images?.[0]
+    || 'https://images.pexels.com/photos/4439901/pexels-photo-4439901.jpeg?auto=compress&cs=tinysrgb&w=400';
 
   const stateConfigs: Record<string, { icon: typeof Swords; color: string; bg: string }> = {
     idle: { icon: Clock, color: 'text-gray-500', bg: 'bg-gray-50' },
@@ -157,7 +159,7 @@ export default function ArenaPage() {
   useEffect(() => {
     async function fetchNegotiations() {
       try {
-        const res = await fetch('/api/negotiations');
+        const res = await fetch('/api/negotiations?enrich=true');
         const data = await res.json();
 
         if (data.negotiations?.length > 0) {

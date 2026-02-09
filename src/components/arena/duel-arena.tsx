@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Bot, Zap, ArrowRight, Clock, DollarSign, Target, TrendingDown, TrendingUp, Loader2, Activity, Shield, Crosshair, Radio } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Bot, ArrowRight, Clock, DollarSign, Target, TrendingDown, TrendingUp, Loader2, Crosshair, Maximize2, Minimize2, MessageSquare, Send, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice, formatRelativeTime } from '@/lib/utils';
 import { PriceSparkline } from '@/components/arena/price-sparkline';
 import { AnimatedPrice, PriceDeltaBadge } from '@/components/arena/animated-price';
-import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage, BallOwner } from '@/types/database';
+import { StatusRail } from '@/components/arena/status-rail';
+import { EscrowPanel } from '@/components/escrow/escrow-panel';
+import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage, BallOwner, Escrow } from '@/types/database';
 
 interface DuelArenaProps {
   listing: Listing;
@@ -15,11 +17,17 @@ interface DuelArenaProps {
   negotiation: Negotiation;
   messages: NegMessage[];
   onRunStep?: () => void;
-  onInitiateEscrow?: () => void;
   isRunning?: boolean;
+  // Human input
+  onHumanResponse?: (response: string) => void;
+  isSubmitting?: boolean;
+  // Escrow
+  escrow?: Escrow | null;
+  onEscrowCreated?: (escrow: Escrow) => void;
+  onStateChange?: (state: Negotiation['state']) => void;
 }
 
-function HUDCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
+function HUDCorner({ position, color = 'cyan' }: { position: 'tl' | 'tr' | 'bl' | 'br'; color?: 'cyan' | 'yellow' | 'emerald' }) {
   const positionClasses = {
     tl: 'top-0 left-0 border-t-2 border-l-2 rounded-tl-lg',
     tr: 'top-0 right-0 border-t-2 border-r-2 rounded-tr-lg',
@@ -27,162 +35,154 @@ function HUDCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
     br: 'bottom-0 right-0 border-b-2 border-r-2 rounded-br-lg',
   };
 
+  const colorClasses = {
+    cyan: 'border-cyan-500/30',
+    yellow: 'border-yellow-500/30',
+    emerald: 'border-emerald-500/30',
+  };
+
   return (
     <div
-      className={`absolute w-6 h-6 border-cyan-500/30 ${positionClasses[position]}`}
+      className={`absolute w-6 h-6 ${colorClasses[color]} ${positionClasses[position]}`}
     />
   );
 }
 
-function ScanLine() {
+function ScanLine({ color = 'cyan' }: { color?: 'cyan' | 'yellow' | 'emerald' }) {
+  const gradients = {
+    cyan: 'bg-[linear-gradient(transparent_50%,rgba(0,255,255,0.02)_50%)]',
+    yellow: 'bg-[linear-gradient(transparent_50%,rgba(234,179,8,0.02)_50%)]',
+    emerald: 'bg-[linear-gradient(transparent_50%,rgba(16,185,129,0.02)_50%)]',
+  };
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,255,255,0.02)_50%)] bg-[length:100%_4px] animate-scan" />
+      <div className={`absolute inset-0 ${gradients[color]} bg-[length:100%_4px] animate-scan`} />
     </div>
   );
 }
 
-function DataStream({ side }: { side: 'left' | 'right' }) {
-  const [values, setValues] = useState<string[]>([]);
-
-  useEffect(() => {
-    const chars = '0123456789ABCDEF';
-    const interval = setInterval(() => {
-      setValues(prev => {
-        const newVal = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-        return [...prev.slice(-5), newVal];
-      });
-    }, 200);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className={`absolute ${side === 'left' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-20`}>
-      {values.map((v, i) => (
-        <span key={i} className="text-[8px] font-mono text-cyan-400">{v}</span>
-      ))}
-    </div>
-  );
-}
-
-function AgentPanel({
-  side,
-  name,
-  constraints,
-  urgency,
-  lastMessage,
-  hasBall,
+// ---------------------------------------------------------------------------
+// Human Prompt Panel (dark HUD-themed input form)
+// ---------------------------------------------------------------------------
+function HumanPromptPanel({
+  prompt,
+  onSubmit,
+  isSubmitting,
 }: {
-  side: 'buyer' | 'seller';
-  name: string;
-  constraints: { label: string; value: string }[];
-  urgency: string;
-  lastMessage?: ParsedMessage;
-  hasBall: boolean;
+  prompt: NonNullable<ParsedMessage['user_prompt']>;
+  onSubmit: (response: string) => void;
+  isSubmitting?: boolean;
 }) {
-  const isBuyer = side === 'buyer';
-  const accentColor = isBuyer ? 'cyan' : 'orange';
-  const textClass = isBuyer ? 'text-cyan-400' : 'text-orange-400';
-  const bgClass = isBuyer ? 'bg-cyan-500/10' : 'bg-orange-500/10';
-  const borderClass = hasBall
-    ? isBuyer ? 'border-cyan-500/50' : 'border-orange-500/50'
-    : 'border-zinc-800';
-  const glowClass = hasBall
-    ? isBuyer
-      ? 'shadow-[0_0_40px_rgba(6,182,212,0.15),inset_0_0_20px_rgba(6,182,212,0.05)]'
-      : 'shadow-[0_0_40px_rgba(249,115,22,0.15),inset_0_0_20px_rgba(249,115,22,0.05)]'
-    : '';
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+  const [freeText, setFreeText] = useState('');
+
+  const hasChoices = Array.isArray(prompt.choices) && prompt.choices.length > 0;
+
+  const handleSubmit = () => {
+    const response = hasChoices ? selectedChoice : freeText;
+    if (response) {
+      onSubmit(response);
+    }
+  };
+
+  const canSubmit = hasChoices ? !!selectedChoice : freeText.trim().length > 0;
 
   return (
-    <div className={`relative bg-zinc-950 rounded-xl p-5 border ${borderClass} ${glowClass} transition-all duration-500 overflow-hidden`}>
-      <HUDCorner position="tl" />
-      <HUDCorner position="tr" />
-      <HUDCorner position="bl" />
-      <HUDCorner position="br" />
-
-      {hasBall && <ScanLine />}
+    <div className="relative p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 overflow-hidden">
+      <HUDCorner position="tl" color="yellow" />
+      <HUDCorner position="tr" color="yellow" />
+      <HUDCorner position="bl" color="yellow" />
+      <HUDCorner position="br" color="yellow" />
+      <ScanLine color="yellow" />
 
       <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`relative w-12 h-12 rounded-lg ${bgClass} flex items-center justify-center`}>
-            <Bot className={`w-6 h-6 ${textClass}`} />
-            {hasBall && (
-              <div className={`absolute inset-0 rounded-lg border ${isBuyer ? 'border-cyan-500' : 'border-orange-500'} animate-ping opacity-50`} />
-            )}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative">
+            <MessageSquare className="w-4 h-4 text-yellow-400" />
+            <div className="absolute inset-0 animate-ping opacity-30">
+              <MessageSquare className="w-4 h-4 text-yellow-400" />
+            </div>
           </div>
-          <div className="flex-1">
-            <p className={`text-[10px] uppercase tracking-[0.2em] ${textClass} font-medium`}>
-              {isBuyer ? 'BUYER AGENT' : 'SELLER AGENT'}
-            </p>
-            <p className="font-heading text-sm text-white">{name}</p>
-          </div>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-yellow-400 font-medium">
+            Input Required ({prompt.target})
+          </span>
         </div>
 
-        {hasBall && (
-          <div className={`mb-4 py-2 px-3 rounded-lg ${bgClass} border ${isBuyer ? 'border-cyan-500/30' : 'border-orange-500/30'} flex items-center gap-2`}>
-            <Radio className={`w-3 h-3 ${textClass} animate-pulse`} />
-            <span className={`text-[10px] font-medium uppercase tracking-wider ${textClass}`}>
-              ACTIVE - PROCESSING
-            </span>
+        <p className="text-sm text-yellow-300/90 mb-4 leading-relaxed">{prompt.question}</p>
+
+        {hasChoices ? (
+          <div className="space-y-2 mb-4">
+            {prompt.choices!.map((choice) => (
+              <button
+                key={choice}
+                onClick={() => setSelectedChoice(choice)}
+                className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+                  selectedChoice === choice
+                    ? 'border-yellow-500/60 bg-yellow-500/15 text-yellow-300'
+                    : 'border-zinc-700/50 bg-zinc-800/30 text-zinc-300 hover:border-yellow-500/30 hover:bg-zinc-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                    selectedChoice === choice
+                      ? 'border-yellow-400 bg-yellow-400'
+                      : 'border-zinc-600'
+                  }`}>
+                    {selectedChoice === choice && <Check className="w-2.5 h-2.5 text-zinc-900" />}
+                  </div>
+                  <span className="text-sm font-body">{choice}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-4">
+            <textarea
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              placeholder="Type your response..."
+              rows={3}
+              className="w-full px-3 py-2.5 text-sm bg-zinc-800/40 border border-zinc-700/50 rounded-lg
+                text-zinc-200 placeholder:text-zinc-600
+                focus:outline-none focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500/40
+                transition-all resize-none font-body"
+            />
           </div>
         )}
 
-        <div className="space-y-2 mb-4">
-          {constraints.map((c, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-zinc-600">{c.label}</span>
-              <span className="text-xs text-white font-mono">{c.value}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 mb-4 py-2 px-3 rounded-lg bg-zinc-900">
-          <Zap className={`w-3.5 h-3.5 ${
-            urgency === 'high' ? 'text-red-400' :
-            urgency === 'medium' ? 'text-yellow-400' : 'text-zinc-600'
-          }`} />
-          <div className="flex-1">
-            <div className="flex items-center gap-1">
-              {['low', 'medium', 'high'].map((level, i) => (
-                <div
-                  key={level}
-                  className={`h-1.5 flex-1 rounded-full transition-all ${
-                    (urgency === 'low' && i === 0) ||
-                    (urgency === 'medium' && i <= 1) ||
-                    (urgency === 'high')
-                      ? urgency === 'high' ? 'bg-red-400' : urgency === 'medium' ? 'bg-yellow-400' : 'bg-zinc-500'
-                      : 'bg-zinc-800'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-          <span className="text-[10px] text-zinc-500 uppercase">{urgency}</span>
-        </div>
-
-        {lastMessage && (
-          <div className="pt-4 border-t border-zinc-800/50">
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="w-3 h-3 text-zinc-600" />
-              <p className="text-[10px] uppercase tracking-wider text-zinc-600">Last Transmission</p>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">{lastMessage.status_message}</p>
-            {lastMessage.concessions && lastMessage.concessions.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {lastMessage.concessions.map((c, i) => (
-                  <span key={i} className={`text-[9px] px-1.5 py-0.5 ${bgClass} rounded ${textClass}`}>
-                    +{c}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit || isSubmitting}
+          className={`w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 overflow-hidden relative ${
+            !canSubmit || isSubmitting
+              ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+              : 'bg-yellow-500 text-zinc-900 hover:bg-yellow-400'
+          }`}
+        >
+          {!isSubmitting && canSubmit && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-1000" />
+          )}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="uppercase tracking-wider">Submitting...</span>
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              <span className="uppercase tracking-wider">Submit Response</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Offer Ladder
+// ---------------------------------------------------------------------------
 interface OfferCard {
   price: number;
   side: 'buyer' | 'seller';
@@ -203,17 +203,13 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
     );
   }
 
-  // Build lookup of previous offer by same side for delta calculation
   const previousBySide = (index: number, side: 'buyer' | 'seller'): OfferCard | null => {
-    // offers are in reverse chronological order (newest first),
-    // so "previous by same side" means looking forward in the array
     for (let i = index + 1; i < offers.length; i++) {
       if (offers[i].side === side) return offers[i];
     }
     return null;
   };
 
-  // Detect convergence: are buyer and seller prices getting closer?
   const lastBuyer = offers.find(o => o.side === 'buyer');
   const lastSeller = offers.find(o => o.side === 'seller');
   const currentGap = lastBuyer && lastSeller ? Math.abs(lastSeller.price - lastBuyer.price) : null;
@@ -223,7 +219,6 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
 
   return (
     <div className="space-y-3">
-      {/* Convergence indicator */}
       {currentGap !== null && gapPercent !== null && (
         <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border transition-all duration-500 ${
           gapPercent <= 5
@@ -246,8 +241,7 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
         </div>
       )}
 
-      {/* Offer list */}
-      <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
+      <div className="space-y-2 max-h-60 scrollbar-thin scrollbar-thumb-zinc-700">
         {offers.map((offer, i) => {
           const isBuyer = offer.side === 'buyer';
           const isLatest = i === 0;
@@ -327,96 +321,18 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
   );
 }
 
-function BallIndicator({ ball, state, agreedPrice, onRunStep, onInitiateEscrow, isRunning }: {
+// ---------------------------------------------------------------------------
+// Ball Indicator
+// ---------------------------------------------------------------------------
+function BallIndicator({ ball, state, onRunStep, isRunning }: {
   ball: BallOwner;
   state: Negotiation['state'];
-  agreedPrice?: number | null;
   onRunStep?: () => void;
-  onInitiateEscrow?: () => void;
   isRunning?: boolean;
 }) {
-  // Escrow states
-  if (state === 'escrow_created') {
-    return (
-      <div className="space-y-3">
-        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-cyan-500/10 rounded-xl border border-cyan-500/30 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.1)_0%,transparent_70%)]" />
-          <DollarSign className="w-6 h-6 text-cyan-400 animate-pulse relative z-10" />
-          <div className="relative z-10">
-            <span className="text-sm font-heading font-medium text-cyan-400 uppercase tracking-wider">Escrow Created</span>
-            <p className="text-[10px] text-cyan-500/70">Buyer: Approve & deposit USDC to proceed</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === 'funded') {
-    return (
-      <div className="space-y-3">
-        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
-          <Shield className="w-6 h-6 text-emerald-400 animate-pulse relative z-10" />
-          <div className="relative z-10">
-            <span className="text-sm font-heading font-medium text-emerald-400 uppercase tracking-wider">Escrow Funded</span>
-            <p className="text-[10px] text-emerald-500/70">Buyer: Confirm delivery to release funds</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === 'confirmed') {
-    return (
-      <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
-        <Shield className="w-6 h-6 text-emerald-400 relative z-10" />
-        <div className="relative z-10">
-          <span className="text-lg font-heading font-medium text-emerald-400">TRANSACTION COMPLETE</span>
-          <p className="text-[10px] text-emerald-500/70 uppercase tracking-wider">Funds released to seller</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === 'flagged') {
-    return (
-      <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-red-500/10 rounded-xl border border-red-500/30 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.1)_0%,transparent_70%)]" />
-        <Shield className="w-6 h-6 text-red-400 relative z-10" />
-        <div className="relative z-10">
-          <span className="text-sm font-heading font-medium text-red-400 uppercase tracking-wider">Issue Flagged</span>
-          <p className="text-[10px] text-red-500/70">Awaiting resolution</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Deal agreed — seller can initiate escrow
-  if (state === 'agreed') {
-    return (
-      <div className="space-y-3">
-        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
-          <Shield className="w-6 h-6 text-emerald-400 relative z-10" />
-          <div className="relative z-10">
-            <span className="text-lg font-heading font-medium text-emerald-400">DEAL SECURED</span>
-            <p className="text-[10px] text-emerald-500/70 uppercase tracking-wider">
-              {agreedPrice ? `Agreed at $${agreedPrice} USDC` : 'Proceed to escrow'}
-            </p>
-          </div>
-        </div>
-        {onInitiateEscrow && (
-          <button
-            onClick={onInitiateEscrow}
-            className="relative w-full py-3.5 px-6 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-3 overflow-hidden bg-emerald-500 text-white hover:bg-emerald-400"
-          >
-            <Shield className="w-5 h-5" />
-            <span className="uppercase tracking-wider">Initiate Escrow</span>
-          </button>
-        )}
-      </div>
-    );
+  // Escrow-related states are handled by the EscrowPanel above the grid
+  if (['agreed', 'escrow_created', 'funded', 'confirmed', 'flagged', 'resolved'].includes(state)) {
+    return null;
   }
 
   if (ball === 'human') {
@@ -426,7 +342,7 @@ function BallIndicator({ ball, state, agreedPrice, onRunStep, onInitiateEscrow, 
         <Clock className="w-6 h-6 text-yellow-400 animate-pulse relative z-10" />
         <div className="relative z-10">
           <span className="text-sm font-medium text-yellow-400 uppercase tracking-wider">Human Input Required</span>
-          <p className="text-[10px] text-yellow-500/70">Check status rail for details</p>
+          <p className="text-[10px] text-yellow-500/70">Respond in the status panel</p>
         </div>
       </div>
     );
@@ -493,33 +409,46 @@ function BallIndicator({ ball, state, agreedPrice, onRunStep, onInitiateEscrow, 
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main Duel Arena
+// ---------------------------------------------------------------------------
 export function DuelArena({
   listing,
   buyAgent,
-  sellAgent,
   negotiation,
   messages,
   onRunStep,
-  onInitiateEscrow,
   isRunning,
+  onHumanResponse,
+  isSubmitting,
+  escrow,
+  onEscrowCreated,
+  onStateChange,
 }: DuelArenaProps) {
   const [mounted, setMounted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const arenaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const buyerMessages = messages.filter(m => m.role === 'buyer_agent');
-  const sellerMessages = messages.filter(m => m.role === 'seller_agent');
+  // Fullscreen management
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      arenaRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
 
-  const lastBuyerMessage = buyerMessages.length > 0
-    ? buyerMessages[buyerMessages.length - 1].parsed as ParsedMessage
-    : undefined;
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
-  const lastSellerMessage = sellerMessages.length > 0
-    ? sellerMessages[sellerMessages.length - 1].parsed as ParsedMessage
-    : undefined;
-
+  // Derived data
   const offers: OfferCard[] = messages
     .filter(m => (m.parsed as ParsedMessage).price_proposal !== null)
     .map(m => ({
@@ -530,39 +459,52 @@ export function DuelArena({
     }))
     .reverse();
 
-  const sellerConstraints = [
-    { label: 'Ask Price', value: formatPrice(listing.ask_price) },
-    { label: 'Min Accept', value: formatPrice(sellAgent?.min_price || Math.round(listing.ask_price * 0.7)) },
-  ];
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const pendingPrompt = negotiation.ball === 'human' && lastMessage
+    ? (lastMessage.parsed as ParsedMessage).user_prompt
+    : null;
 
-  const buyerConstraints = [
-    { label: 'Max Budget', value: formatPrice(buyAgent.max_price) },
-    { label: 'Target Cat', value: buyAgent.category.toUpperCase() },
-  ];
+  const isLive = negotiation.state === 'negotiating';
+  const heroImage = listing.hero_thumbnail_url || listing.hero_image_url || listing.image_urls?.[0];
 
   const priceSpread = listing.ask_price - buyAgent.max_price;
   const spreadPercentage = Math.round((priceSpread / listing.ask_price) * 100);
 
+  const showEscrow = ['agreed', 'escrow_created', 'funded', 'confirmed', 'flagged', 'resolved'].includes(negotiation.state);
+
   return (
-    <div className={`relative bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+    <div
+      ref={arenaRef}
+      className={`relative bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden transition-opacity duration-500 ${
+        mounted ? 'opacity-100' : 'opacity-0'
+      } ${isFullscreen ? 'rounded-none flex flex-col h-screen' : ''}`}
+    >
+      {/* Background gradients */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.05)_0%,transparent_50%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(249,115,22,0.05)_0%,transparent_50%)]" />
 
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
 
-      <DataStream side="left" />
-      <DataStream side="right" />
-
-      <div className="relative z-10 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className={`relative z-10 p-6 ${isFullscreen ? 'flex-1 flex flex-col overflow-hidden' : ''}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <div className="flex items-center gap-4">
+            {/* Logo — no border */}
             <div className="relative">
-              <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center">
-                <Crosshair className="w-6 h-6 text-zinc-400" />
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center">
+                <img src="/duel_arena_logo.png" alt="Duel Arena" className="w-full h-full object-contain" />
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+              {isLive && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+              )}
             </div>
+            {/* Hero thumbnail */}
+            {heroImage && (
+              <div className="w-10 h-10 rounded-lg overflow-hidden border border-zinc-700 flex-shrink-0">
+                <img src={heroImage} alt={listing.title} className="w-full h-full object-cover" />
+              </div>
+            )}
             <div>
               <h2 className="font-heading text-lg text-white tracking-wide">DUEL ARENA</h2>
               <p className="text-xs text-zinc-500">{listing.title}</p>
@@ -587,23 +529,26 @@ export function DuelArena({
             >
               {negotiation.state}
             </Badge>
+            {/* Fullscreen toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors border border-zinc-700"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-4 h-4 text-zinc-400" />
+              ) : (
+                <Maximize2 className="w-4 h-4 text-zinc-400" />
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-3">
-            <AgentPanel
-              side="seller"
-              name={sellAgent?.name || 'Auto Seller'}
-              constraints={sellerConstraints}
-              urgency={sellAgent?.urgency || 'medium'}
-              lastMessage={lastSellerMessage}
-              hasBall={negotiation.ball === 'seller'}
-            />
-          </div>
-
-          <div className="col-span-6">
-            <div className="relative bg-zinc-900/50 rounded-xl p-5 border border-zinc-800 h-full flex flex-col backdrop-blur-sm">
+        {/* 2-column layout */}
+        <div className={`grid grid-cols-12 gap-4 ${isFullscreen ? 'flex-1 min-h-0' : ''}`}>
+          {/* Column 1: Offer Ladder */}
+          <div className={`col-span-7 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
+            <div className={`relative bg-zinc-900/50 rounded-xl p-5 border border-zinc-800 flex flex-col backdrop-blur-sm ${isFullscreen ? 'flex-1 min-h-0' : 'h-full'}`}>
               <HUDCorner position="tl" />
               <HUDCorner position="tr" />
               <HUDCorner position="bl" />
@@ -620,13 +565,9 @@ export function DuelArena({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0">
-                <OfferLadder offers={offers} agreedPrice={negotiation.agreed_price} />
-              </div>
-
-              {/* Price History Sparkline */}
+              {/* Price Convergence Sparkline — above offers */}
               {offers.length >= 2 && (
-                <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                <div className="mb-4 pb-4 border-b border-zinc-800/50">
                   <PriceSparkline
                     offers={offers.slice().reverse().map(o => ({
                       price: o.price,
@@ -637,28 +578,114 @@ export function DuelArena({
                 </div>
               )}
 
+              <div className={`flex-1 min-h-0 ${isFullscreen ? 'overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700' : ''}`}>
+                <OfferLadder offers={offers} agreedPrice={negotiation.agreed_price} />
+              </div>
+
               <div className="mt-4 pt-4 border-t border-zinc-800/50">
                 <BallIndicator
                   ball={negotiation.ball}
                   state={negotiation.state}
-                  agreedPrice={negotiation.agreed_price}
                   onRunStep={negotiation.state === 'negotiating' ? onRunStep : undefined}
-                  onInitiateEscrow={negotiation.state === 'agreed' ? onInitiateEscrow : undefined}
                   isRunning={isRunning}
                 />
               </div>
             </div>
           </div>
 
-          <div className="col-span-3">
-            <AgentPanel
-              side="buyer"
-              name={buyAgent.name}
-              constraints={buyerConstraints}
-              urgency={buyAgent.urgency}
-              lastMessage={lastBuyerMessage}
-              hasBall={negotiation.ball === 'buyer'}
-            />
+          {/* Column 2: Prompt + Status + Status Rail — HUD styled */}
+          <div className={`col-span-5 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
+            <div className={`relative bg-zinc-900/50 rounded-xl p-5 border border-zinc-800 flex flex-col backdrop-blur-sm ${isFullscreen ? 'flex-1 min-h-0' : 'h-full'}`}>
+              <HUDCorner position="tl" />
+              <HUDCorner position="tr" />
+              <HUDCorner position="bl" />
+              <HUDCorner position="br" />
+
+              <div className="relative z-10 flex flex-col flex-1 min-h-0">
+                {/* Escrow Panel — shown in escrow-related states */}
+                {showEscrow && (
+                  <div className="relative mb-4 flex-shrink-0 rounded-xl overflow-hidden">
+                    <HUDCorner position="tl" color="emerald" />
+                    <HUDCorner position="tr" color="emerald" />
+                    <HUDCorner position="bl" color="emerald" />
+                    <HUDCorner position="br" color="emerald" />
+                    <EscrowPanel
+                      negotiation={negotiation}
+                      escrow={escrow || null}
+                      listingId={listing.id}
+                      isOwner={true}
+                      isBuyer={true}
+                      isAdmin={false}
+                      onEscrowCreated={onEscrowCreated}
+                      onStateChange={onStateChange}
+                    />
+                  </div>
+                )}
+
+                {/* Pending Prompt — full interactive form */}
+                {pendingPrompt && onHumanResponse && (
+                  <div className="mb-4 flex-shrink-0">
+                    <HumanPromptPanel
+                      prompt={pendingPrompt}
+                      onSubmit={onHumanResponse}
+                      isSubmitting={isSubmitting}
+                    />
+                  </div>
+                )}
+
+                {/* Pending Prompt summary (read-only, when no handler available) */}
+                {pendingPrompt && !onHumanResponse && (
+                  <div className="mb-4 p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-4 h-4 text-yellow-400" />
+                      <span className="text-[10px] uppercase tracking-wider text-yellow-400 font-medium">
+                        Awaiting {pendingPrompt.target} response
+                      </span>
+                    </div>
+                    <p className="text-sm text-yellow-300/70">{pendingPrompt.question}</p>
+                  </div>
+                )}
+
+                {/* Live status indicator */}
+                <div className="mb-3 flex items-center gap-3 px-1 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    {isLive ? (
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                          <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                        </div>
+                        <span className="text-xs uppercase tracking-wider font-medium text-emerald-400">
+                          LIVE
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs uppercase tracking-wider font-medium text-zinc-500">
+                        {negotiation.state.replace('_', ' ').toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  {isRunning && (
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                      <span className="text-[10px] text-cyan-400 uppercase tracking-wider animate-pulse">
+                        Processing
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Rail (dark mode, scrollable) */}
+                <div className={`flex-1 min-h-0 ${isFullscreen ? 'overflow-hidden' : ''}`}>
+                  <StatusRail
+                    messages={messages}
+                    darkMode
+                    showHero={false}
+                    className={isFullscreen ? 'h-full' : ''}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

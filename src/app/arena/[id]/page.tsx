@@ -5,13 +5,7 @@ import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { DuelArena } from '@/components/arena/duel-arena';
-import { StatusRail } from '@/components/arena/status-rail';
-import { HumanInput } from '@/components/arena/human-input';
-import { EscrowPanel } from '@/components/escrow/escrow-panel';
-import { ImageGallery } from '@/components/listings/image-gallery';
-import { EventFeed } from '@/components/feed/event-feed';
 import { TurnIndicator, TurnBadge } from '@/components/negotiation/turn-indicator';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, ParsedMessage, Escrow } from '@/types/database';
 
@@ -245,36 +239,6 @@ export default function ArenaPage({ params }: ArenaPageProps) {
     }
   };
 
-  const handleInitiateEscrow = async () => {
-    if (!negotiation || !listing) return;
-
-    // For now, auto-create escrow via the API (seller action)
-    try {
-      const res = await fetch('/api/escrow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          negotiation_id: negotiation.id,
-          item_id: listing.id,
-          usdc_amount: negotiation.agreed_price,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        console.error('[arena] Failed to create escrow:', data.error);
-        return;
-      }
-
-      if (data.escrow) {
-        setEscrow(data.escrow);
-        setNegotiation(prev => prev ? { ...prev, state: 'escrow_created', ball: 'buyer' } : null);
-      }
-    } catch (err) {
-      console.error('Failed to initiate escrow:', err);
-    }
-  };
-
   if (loading) {
     return (
       <MainLayout>
@@ -297,14 +261,6 @@ export default function ArenaPage({ params }: ArenaPageProps) {
       </MainLayout>
     );
   }
-
-  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const pendingPrompt = negotiation.ball === 'human' && lastMessage
-    ? (lastMessage.parsed as ParsedMessage).user_prompt
-    : null;
-
-  // Show escrow panel when negotiation reaches escrow-related states
-  const showEscrow = ['agreed', 'escrow_created', 'funded', 'confirmed', 'flagged', 'resolved'].includes(negotiation.state);
 
   return (
     <MainLayout>
@@ -334,82 +290,23 @@ export default function ArenaPage({ params }: ArenaPageProps) {
           </div>
         </div>
 
-        <div className="mb-6">
-          <DuelArena
-            listing={listing}
-            buyAgent={buyAgent}
-            sellAgent={sellAgent}
-            negotiation={negotiation}
-            messages={messages}
+        <DuelArena
+          listing={listing}
+          buyAgent={buyAgent}
+          sellAgent={sellAgent}
+          negotiation={negotiation}
+          messages={messages}
             onRunStep={handleRunStep}
-            onInitiateEscrow={handleInitiateEscrow}
             isRunning={running}
-          />
-        </div>
-
-        {pendingPrompt && (
-          <div className="mb-6">
-            <HumanInput
-              prompt={pendingPrompt}
-              onSubmit={handleHumanResponse}
-              isSubmitting={submitting}
-            />
-          </div>
-        )}
-
-        {showEscrow && (
-          <div className="mb-6">
-            <EscrowPanel
-              negotiation={negotiation}
-              escrow={escrow}
-              listingId={listing.id}
-              isOwner={true}
-              isBuyer={true}
-              isAdmin={false}
-              onEscrowCreated={(esc) => setEscrow(esc)}
-              onStateChange={(newState) => {
-                setNegotiation(prev => prev ? { ...prev, state: newState } : null);
-                // Refetch to get latest data
-                fetchData();
-              }}
-            />
-          </div>
-        )}
-
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-3">
-            <div className="sticky top-4 space-y-4">
-              <ImageGallery images={listing.image_urls} />
-              <Card>
-                <div className="text-xs text-bp-muted space-y-1">
-                  <div className="flex justify-between">
-                    <span>Ask Price</span>
-                    <span className="font-medium text-bp-seller">${listing.ask_price}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Category</span>
-                    <span className="font-medium">{listing.category}</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-          <div className="col-span-5">
-            <StatusRail messages={messages} listing={listing} />
-          </div>
-          <div className="col-span-4">
-            <Card dark>
-              <EventFeed
-                negotiationId={negotiation.id}
-                title="Live Feed"
-                compact={true}
-                showPromptFilter={true}
-                emptyMessage="Waiting for activity..."
-                autoScroll={true}
-              />
-            </Card>
-          </div>
-        </div>
+          onHumanResponse={handleHumanResponse}
+          isSubmitting={submitting}
+          escrow={escrow}
+          onEscrowCreated={(esc) => setEscrow(esc)}
+          onStateChange={(newState) => {
+            setNegotiation(prev => prev ? { ...prev, state: newState } : null);
+            fetchData();
+          }}
+        />
       </div>
     </MainLayout>
   );
