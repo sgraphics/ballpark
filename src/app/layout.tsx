@@ -6,6 +6,9 @@ import { SuppressExtensionErrors } from '@/components/suppress-extension-errors'
 export const metadata: Metadata = {
   title: 'Ballpark - Agentic Marketplace',
   description: 'AI-powered buyer and seller agents negotiate on your behalf',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
