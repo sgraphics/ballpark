@@ -343,51 +343,57 @@ export default function BuyAgentsPage() {
   return (
     <MainLayout>
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
           <div>
             <h1 className="font-heading text-2xl tracking-tight">My Buy Agents</h1>
             <p className="text-sm text-bp-muted mt-0.5">
               {activeAgentCount} active, {buyAgents.length - activeAgentCount} inactive
             </p>
           </div>
-          <Link href="/buy/new">
+          <Link href="/buy/new" className="hidden md:inline-block">
             <Button variant="buyer" size="sm">
               <Plus className="w-3.5 h-3.5 mr-1.5" /> New Buy Agent
             </Button>
           </Link>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-4 space-y-3">
-            {buyAgents.map((agent, i) => (
-              <div key={agent.id} className="animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
-                <BuyAgentCard
-                  agent={agent}
-                  matchCount={matchCounts[agent.id] || 0}
-                  onClick={() => handleSelectAgent(agent.id)}
-                  onStatusChange={handleStatusChange}
-                  selected={selectedAgentId === agent.id}
-                />
-              </div>
-            ))}
+        <div className="md:grid md:grid-cols-12 md:gap-6 space-y-6 md:space-y-0">
+          {/* Buy agents section - shows first on mobile, second on desktop */}
+          <div className="order-1 md:order-1 md:col-span-4">
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
+              {buyAgents.map((agent, i) => (
+                <div key={agent.id} className="animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
+                  <BuyAgentCard
+                    agent={agent}
+                    matchCount={matchCounts[agent.id] || 0}
+                    onClick={() => handleSelectAgent(agent.id)}
+                    onStatusChange={handleStatusChange}
+                    selected={selectedAgentId === agent.id}
+                  />
+                </div>
+              ))}
 
-            {buyAgents.length === 0 && (
-              <Card className="text-center py-12">
-                <Bot className="w-8 h-8 text-bp-muted-light mx-auto mb-3" />
-                <p className="text-sm text-bp-muted">No buy agents yet</p>
-                <Link href="/buy/new" className="inline-block mt-3">
-                  <Button variant="buyer" size="sm">
-                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Create One
-                  </Button>
-                </Link>
-              </Card>
-            )}
+              {buyAgents.length === 0 && (
+                <div className="col-span-2 md:col-span-1">
+                  <Card className="text-center py-12">
+                    <Bot className="w-8 h-8 text-bp-muted-light mx-auto mb-3" />
+                    <p className="text-sm text-bp-muted">No buy agents yet</p>
+                    <Link href="/buy/new" className="inline-block mt-3">
+                      <Button variant="buyer" size="sm">
+                        <Plus className="w-3.5 h-3.5 mr-1.5" /> Create One
+                      </Button>
+                    </Link>
+                  </Card>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="col-span-8">
+          {/* Matches section - shows second on mobile, second on desktop */}
+          <div className="order-2 md:order-2 md:col-span-8">
             {selectedAgentId ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <h2 className="font-heading text-lg">
                       Potential Matches
@@ -400,7 +406,7 @@ export default function BuyAgentsPage() {
                     {autoSearching && (
                       <div className="flex items-center gap-1.5 text-bp-buyer">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span className="text-[11px] font-medium">Auto-searching...</span>
+                        <span className="text-[11px] font-medium hidden sm:inline">Auto-searching...</span>
                       </div>
                     )}
                   </div>
@@ -412,7 +418,8 @@ export default function BuyAgentsPage() {
                     disabled={running || autoSearching}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${running ? 'animate-spin' : ''}`} />
-                    {running ? 'Searching...' : 'Run Finder'}
+                    <span className="hidden sm:inline">{running ? 'Searching...' : 'Run Finder'}</span>
+                    <span className="sm:hidden">{running ? 'Searching' : 'Finder'}</span>
                   </Button>
                 </div>
 

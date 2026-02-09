@@ -1,10 +1,10 @@
 'use client';
 
-import { Handshake, X, ExternalLink, AlertCircle, TrendingUp } from 'lucide-react';
+import { Handshake, X, AlertCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatPrice, getConfidenceColor } from '@/lib/utils';
+import { formatPrice } from '@/lib/utils';
 import type { ConditionNote } from '@/types/database';
 import Link from 'next/link';
 
@@ -24,29 +24,6 @@ interface MatchCardProps {
   onNegotiate: (matchId: string) => void;
   onDismiss: (matchId: string) => void;
   loading?: boolean;
-}
-
-function ScoreIndicator({ score }: { score: number }) {
-  const color =
-    score >= 70
-      ? 'text-bp-success'
-      : score >= 50
-        ? 'text-bp-warning'
-        : 'text-bp-muted';
-
-  const bg =
-    score >= 70
-      ? 'bg-bp-success-soft'
-      : score >= 50
-        ? 'bg-bp-warning-soft'
-        : 'bg-gray-100';
-
-  return (
-    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${bg}`}>
-      <TrendingUp className={`w-3.5 h-3.5 ${color}`} />
-      <span className={`text-sm font-medium font-body ${color}`}>{score}</span>
-    </div>
-  );
 }
 
 export function MatchCard({ match, onNegotiate, onDismiss, loading }: MatchCardProps) {
@@ -71,7 +48,7 @@ export function MatchCard({ match, onNegotiate, onDismiss, loading }: MatchCardP
 
         <div className="flex-1 min-w-0 py-0.5">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <Link
                 href={`/listings/${match.listing_id}`}
                 className="font-heading text-sm font-medium hover:underline truncate block"
@@ -82,7 +59,6 @@ export function MatchCard({ match, onNegotiate, onDismiss, loading }: MatchCardP
                 <Badge className="mt-1">{match.listing_category}</Badge>
               )}
             </div>
-            <ScoreIndicator score={match.score} />
           </div>
 
           <p className="text-xs text-bp-muted mt-1.5 line-clamp-1 font-body">{match.reason}</p>

@@ -5,6 +5,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 
 export function Header() {
   const { searchQuery, setSearchQuery, setCurrentUser, currentUser } = useAppStore();
@@ -70,8 +71,18 @@ export function Header() {
   const walletAddress = currentUser?.wallet_address || '';
 
   return (
-    <header className="fixed top-0 left-60 right-0 h-14 bg-white/80 backdrop-blur-sm border-b border-bp-border z-30 flex items-center px-6 gap-4">
-      <div className="relative flex-1 max-w-md">
+    <header className="fixed top-0 left-0 md:left-60 right-0 h-14 bg-white/80 backdrop-blur-sm border-b border-bp-border z-30 flex items-center px-4 md:px-6 gap-4">
+      {/* Logo - visible on mobile only */}
+      <Link href="/" className="md:hidden flex items-center">
+        <img
+          src="/logo.png"
+          alt="ballpark"
+          className="h-5 w-auto"
+        />
+      </Link>
+
+      {/* Search bar - hidden on mobile */}
+      <div className="hidden md:block relative flex-1 max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bp-muted" />
         <input
           type="text"
@@ -89,20 +100,21 @@ export function Header() {
           <div className="px-3 py-1.5 text-xs text-bp-muted">Loading...</div>
         ) : authenticated && walletAddress ? (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-bp-border">
+            {/* Wallet address - hidden on mobile */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-bp-border">
               <Wallet className="w-3.5 h-3.5 text-bp-muted" />
               <span className="text-xs font-mono text-bp-muted">
                 {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
               </span>
             </div>
             <Button variant="ghost" size="sm" onClick={logout}>
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" />
             </Button>
           </div>
         ) : (
           <Button variant="primary" size="sm" onClick={login}>
-            <LogIn className="w-3.5 h-3.5 mr-2" />
-            Connect
+            <LogIn className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">Connect</span>
           </Button>
         )}
       </div>

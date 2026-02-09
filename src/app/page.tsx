@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Zap, TrendingUp, Bot, ShoppingBag, Target } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { EventFeed } from '@/components/feed/event-feed';
-import { CategoryFilter } from '@/components/feed/category-filter';
+import { HorizontalCategoryFilter } from '@/components/feed/horizontal-category-filter';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 
 export default function HomePage() {
   const [finderRunning, setFinderRunning] = useState(false);
@@ -21,51 +20,30 @@ export default function HomePage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
           <div>
             <h1 className="font-heading text-2xl tracking-tight">Activity Feed</h1>
             <p className="text-sm text-bp-muted mt-0.5">Real-time updates from your agents</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="primary" size="sm" loading={finderRunning} onClick={handleRunFinder}>
-              <Zap className="w-3.5 h-3.5 mr-1.5" /> Run Finder
+              <Zap className="w-3.5 h-3.5 mr-1.5" /> <span className="hidden sm:inline">Run Finder</span><span className="sm:hidden">Finder</span>
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-3 space-y-4">
-            <CategoryFilter />
-            <Card>
-              <h3 className="font-heading text-sm mb-3">Quick Stats</h3>
-              <div className="space-y-2.5">
-                {[
-                  { icon: ShoppingBag, label: 'Active Listings', value: '12', color: 'text-bp-seller' },
-                  { icon: Bot, label: 'Buy Agents', value: '3', color: 'text-bp-buyer' },
-                  { icon: TrendingUp, label: 'Negotiations', value: '5', color: 'text-bp-black' },
-                  { icon: Target, label: 'Pending Matches', value: '8', color: 'text-bp-warning' },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-bp-muted">
-                      <stat.icon className="w-3.5 h-3.5" />
-                      {stat.label}
-                    </div>
-                    <span className={`font-medium ${stat.color}`}>{stat.value}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          <div className="col-span-9">
-            <EventFeed
-              title="Live Activity"
-              showPromptFilter={true}
-              emptyMessage="No activity yet. Create a listing or buy agent to get started."
-            />
-          </div>
+        {/* Horizontal category filter */}
+        <div className="mb-6">
+          <HorizontalCategoryFilter />
         </div>
+
+        {/* Main content */}
+        <EventFeed
+          title="Live Activity"
+          showPromptFilter={true}
+          emptyMessage="No activity yet. Create a listing or buy agent to get started."
+        />
       </div>
     </MainLayout>
   );

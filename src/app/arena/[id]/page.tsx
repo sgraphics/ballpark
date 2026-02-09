@@ -288,7 +288,7 @@ export default function ArenaPage({ params }: ArenaPageProps) {
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <Link href="/arena">
               <Button variant="ghost" size="sm">
@@ -298,12 +298,11 @@ export default function ArenaPage({ params }: ArenaPageProps) {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="font-heading text-xl tracking-tight">{listing.title}</h1>
-                <TurnBadge ball={negotiation.ball} state={negotiation.state} />
               </div>
               <p className="text-xs text-bp-muted mt-0.5">Negotiation #{negotiation.id.slice(0, 8)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4">
             <TurnIndicator ball={negotiation.ball} state={negotiation.state} />
             <Link href={`/listings/${listing.id}`}>
               <Button variant="secondary" size="sm">

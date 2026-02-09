@@ -25,7 +25,7 @@ export function Sidebar() {
   const { sidebarTab, setSidebarTab } = useAppStore();
 
   return (
-    <aside className="fixed left-0 top-0 w-60 h-screen bg-white border-r border-bp-border z-40 flex flex-col">
+    <aside className="hidden md:flex fixed left-0 top-0 w-60 h-screen bg-white border-r border-bp-border z-40 flex-col">
       <div className="p-5 border-b border-bp-border">
         <Link href="/" onClick={() => setSidebarTab('feed')}>
           <img
