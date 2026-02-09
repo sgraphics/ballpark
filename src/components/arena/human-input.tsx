@@ -16,7 +16,7 @@ export function HumanInput({ prompt, onSubmit, isSubmitting }: HumanInputProps) 
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [freeText, setFreeText] = useState('');
 
-  const hasChoices = prompt.choices && prompt.choices.length > 0;
+  const hasChoices = Array.isArray(prompt.choices) && prompt.choices.length > 0;
 
   const handleSubmit = () => {
     const response = hasChoices ? selectedChoice : freeText;

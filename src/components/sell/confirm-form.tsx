@@ -17,6 +17,7 @@ export interface ListingFormData {
   min_price: string;
   urgency: string;
   agent_name: string;
+  internal_notes: string;
 }
 
 interface ConfirmFormProps {
@@ -135,7 +136,7 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
               step="0.01"
               value={formData.min_price}
               onChange={(e) => update('min_price', e.target.value)}
-              placeholder="0.00"
+              placeholder="Leave empty to be asked during negotiation"
             />
             <Select
               label="Urgency"
@@ -146,6 +147,20 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
                 { value: 'medium', label: 'Medium - Reasonable timeline' },
                 { value: 'high', label: 'High - Sell quickly' },
               ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-bp-muted mb-1 font-body">
+              Internal Notes <span className="text-bp-muted-light">(private — only your agent sees this)</span>
+            </label>
+            <textarea
+              value={formData.internal_notes}
+              onChange={(e) => update('internal_notes', e.target.value)}
+              placeholder="Any private info for your agent: known issues, reason for selling, repair history, flexibility on price, etc. Buyers never see this."
+              rows={3}
+              className="w-full px-3 py-2 text-sm font-body border border-bp-border rounded-lg
+                focus:outline-none focus:ring-2 focus:ring-bp-black/10 focus:border-bp-black
+                placeholder:text-bp-muted-light transition-all resize-none"
             />
           </div>
         </div>

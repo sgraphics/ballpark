@@ -279,6 +279,30 @@ const migrations: Migration[] = [
       END $$;
     `,
   },
+  {
+    id: '017',
+    name: 'add_internal_notes',
+    sql: `
+      DO $$
+      BEGIN
+        -- Add internal_notes to sell_agents
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'sell_agents' AND column_name = 'internal_notes'
+        ) THEN
+          ALTER TABLE sell_agents ADD COLUMN internal_notes TEXT DEFAULT '';
+        END IF;
+
+        -- Add internal_notes to buy_agents
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'buy_agents' AND column_name = 'internal_notes'
+        ) THEN
+          ALTER TABLE buy_agents ADD COLUMN internal_notes TEXT DEFAULT '';
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations(): Promise<{ applied: string[]; skipped: string[] }> {

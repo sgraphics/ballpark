@@ -23,6 +23,7 @@ const DEMO_SELL_AGENTS: SellAgentWithListings[] = [
     min_price: 360,
     urgency: 'medium',
     preferences: { auto_counter: true },
+    internal_notes: '',
     created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
     listings: [
       {
@@ -52,6 +53,7 @@ const DEMO_SELL_AGENTS: SellAgentWithListings[] = [
     min_price: 1530,
     urgency: 'low',
     preferences: { auto_counter: true },
+    internal_notes: '',
     created_at: new Date(Date.now() - 86400000 * 14).toISOString(),
     listings: [
       {

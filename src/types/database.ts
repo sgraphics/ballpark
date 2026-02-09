@@ -38,6 +38,7 @@ export interface SellAgent {
   min_price: number;
   urgency: 'low' | 'medium' | 'high';
   preferences: Record<string, unknown>;
+  internal_notes: string;
   created_at: string;
 }
 
@@ -53,6 +54,7 @@ export interface BuyAgent {
   max_price: number;
   urgency: 'low' | 'medium' | 'high';
   status: BuyAgentStatus;
+  internal_notes: string;
   created_at: string;
 }
 

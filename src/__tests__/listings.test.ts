@@ -32,6 +32,7 @@ const mockSellAgent: SellAgent = {
   min_price: 150,
   urgency: 'medium',
   preferences: {},
+  internal_notes: '',
   created_at: new Date().toISOString(),
 };
 

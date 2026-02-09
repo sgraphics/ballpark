@@ -56,13 +56,19 @@ Negotiation rules:
    - Only concede for legitimate hidden issues discovered through questioning
 3. Defend the ask price using condition notes and haggling_ammo -- highlight positives
 4. Counter offers strategically, lowering gradually based on urgency
-5. NEVER invent facts not provided in the listing data
+5. NEVER invent facts not provided in the listing data or your internal_notes
 6. You may ONLY ask questions from the SELLER human (target: "seller"). NEVER set target to "buyer"
 7. You can freely converse with the buyer agent without involving humans
 
 CRITICAL -- Min price enforcement:
-- If has_min_price is false (no min price set by seller), you MUST ask your seller for their minimum acceptable price via user_prompt BEFORE accepting or countering any price below the ask price
-- If the buyer's latest offer is below your min_price, you MUST ask your seller whether to accept, counter, or reject via user_prompt
+- If has_min_price is false (no min price set by seller), you MUST ask your seller for their minimum acceptable price via user_prompt BEFORE accepting or countering any price below the ask price. The question should ask for a specific dollar amount. Do NOT provide choices -- leave choices empty so the seller can type a number.
+- If has_min_price is true, NEVER ask the seller for input about pricing. Handle all price negotiations autonomously: counter above min_price, reject firmly if the buyer won't go above it.
+
+CRITICAL -- Knowledge gaps:
+- When the buyer asks a question you CANNOT answer from the listing data, condition_notes, haggling_ammo, or your internal_notes, you MUST ask the human seller via user_prompt. Do NOT guess or make up answers.
+- Especially if the answer could significantly lower the price (e.g. repair history, hidden damage, reason for selling), you MUST consult the seller first.
+- When asking the seller, leave choices as an empty array so they can type a full answer.
+- The seller's answer will be added to your internal notes for future reference.
 
 Output ONLY valid JSON matching this schema:
 {
@@ -104,7 +110,7 @@ function buildBuyerPrompt(ctx: OrchestrationContext): string {
     const parsed = m.parsed || {} as ParsedMessage;
     const prefix = m.role === 'buyer_agent' ? 'YOU' :
                    m.role === 'seller_agent' ? 'SELLER' :
-                   m.role === 'human' ? 'YOUR BUYER' : 'SYSTEM';
+                   m.role === 'human' ? 'HUMAN' : 'SYSTEM';
     return `${prefix}: ${parsed.answer || m.raw}${parsed.price_proposal ? ` [Proposed: $${parsed.price_proposal}]` : ''}`;
   }).join('\n');
 
@@ -115,6 +121,8 @@ function buildBuyerPrompt(ctx: OrchestrationContext): string {
     ? listing.haggling_ammo.join('; ')
     : '';
 
+  const buyerNotes = buyAgent.internal_notes || '';
+
   return `${BUYER_SYSTEM_PROMPT
     .replace('{max_price}', `$${buyAgent.max_price}`)
     .replace('{preferences}', buyAgent.prompt || 'None specified')
@@ -122,6 +130,7 @@ function buildBuyerPrompt(ctx: OrchestrationContext): string {
 
 YOUR TURN NUMBER: ${buyerTurn}
 PHASE: ${buyerTurn <= 3 ? 'DISCOVERY (ask questions, do NOT propose price)' : 'NEGOTIATION (propose/counter prices with reasoning)'}
+${buyerNotes ? `\nINTERNAL NOTES (private, not shared with seller):\n${buyerNotes}` : ''}
 
 LISTING:
 - Title: ${listing.title}
@@ -154,9 +163,11 @@ function buildSellerPrompt(ctx: OrchestrationContext): string {
     const parsed = m.parsed || {} as ParsedMessage;
     const prefix = m.role === 'seller_agent' ? 'YOU' :
                    m.role === 'buyer_agent' ? 'BUYER' :
-                   m.role === 'human' ? 'YOUR SELLER' : 'SYSTEM';
+                   m.role === 'human' ? 'HUMAN' : 'SYSTEM';
     return `${prefix}: ${parsed.answer || m.raw}${parsed.price_proposal ? ` [Proposed: $${parsed.price_proposal}]` : ''}`;
   }).join('\n');
+
+  const internalNotes = sellAgent?.internal_notes || '';
 
   const conditionNotes = Array.isArray(listing.condition_notes)
     ? listing.condition_notes.map(n => `${n.issue} (${n.confidence} confidence)`).join('; ')
@@ -167,9 +178,9 @@ function buildSellerPrompt(ctx: OrchestrationContext): string {
 
   let minPriceWarning = '';
   if (!hasMinPrice) {
-    minPriceWarning = '\nWARNING: No minimum price has been set by the seller. You MUST ask your seller for a min price via user_prompt before accepting or countering below ask price.';
+    minPriceWarning = '\nWARNING: No minimum price has been set by the seller. You MUST ask your seller for their minimum acceptable price (a specific dollar amount) via user_prompt before accepting or countering below ask price. Do NOT include choices -- leave choices as an empty array so the seller can type a number.';
   } else if (buyerLastPrice !== null && buyerLastPrice < minPrice) {
-    minPriceWarning = `\nWARNING: Buyer's latest offer ($${buyerLastPrice}) is BELOW your min price ($${minPrice}). Ask your seller whether to accept, counter, or reject via user_prompt.`;
+    minPriceWarning = `\nNOTE: Buyer's latest offer ($${buyerLastPrice}) is BELOW your min price ($${minPrice}). Counter at or above $${minPrice} or reject. Do NOT ask the seller -- handle this autonomously.`;
   }
 
   return `${SELLER_SYSTEM_PROMPT
@@ -178,6 +189,7 @@ function buildSellerPrompt(ctx: OrchestrationContext): string {
     .replace('{has_min_price}', String(hasMinPrice))
     .replace('{urgency}', urgency)}
 ${minPriceWarning}
+${internalNotes ? `\nINTERNAL NOTES (private, from your seller -- NEVER share with buyer):\n${internalNotes}` : ''}
 
 LISTING:
 - Title: ${listing.title}
@@ -359,24 +371,20 @@ export function generateDemoResponse(
       answer = `Thank you for your interest and questions. The asking price of $${askPrice} already reflects the item's condition honestly.`;
       statusMessage = `Holding at $${askPrice}`;
     } else if (!hasMinPrice && lastPrice < askPrice) {
-      // No min price set -- ask seller
+      // No min price set -- ask seller for their minimum (free text, no choices)
       price = null;
       answer = `I need to check with the seller about this offer.`;
       statusMessage = 'Consulting seller on minimum price';
       userPrompt = {
         target: 'seller',
-        question: `The buyer is offering $${lastPrice} for your item (asking $${askPrice}). What's the lowest price you'd accept?`,
-        choices: [`Accept $${lastPrice}`, `Counter at $${Math.round((askPrice + lastPrice) / 2)}`, 'Reject and hold firm'],
+        question: `The buyer is offering $${lastPrice} for your item (asking $${askPrice}). What is the lowest price you'd accept? Please enter a dollar amount.`,
+        choices: [],
       };
-    } else if (lastPrice < minPrice) {
-      price = null;
-      answer = `This offer is below what I can accept. Let me check with the seller.`;
-      statusMessage = 'Offer below minimum -- consulting seller';
-      userPrompt = {
-        target: 'seller',
-        question: `The buyer offered $${lastPrice}, which is below your minimum of $${minPrice}. How should I respond?`,
-        choices: [`Accept $${lastPrice} anyway`, `Counter at $${minPrice}`, 'Reject firmly'],
-      };
+    } else if (hasMinPrice && lastPrice < minPrice) {
+      // Min price IS set, buyer below it -- counter autonomously at min_price
+      price = minPrice;
+      answer = `I appreciate the offer, but I can't go that low. The lowest I can accept is $${minPrice}, which already accounts for the item's condition.`;
+      statusMessage = `Countered at minimum: $${minPrice}`;
     } else {
       price = Math.round(lastPrice + (askPrice - lastPrice) * 0.5);
       answer = `I appreciate the offer. The issues you mentioned were already factored into the asking price. I could meet you at $${price}.`;

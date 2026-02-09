@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { pushUpdate } from '@/lib/sse';
-import type { Negotiation, NegMessage, ParsedMessage } from '@/types/database';
+import type { Negotiation, NegMessage, ParsedMessage, SellAgent } from '@/types/database';
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,10 +63,52 @@ export async function POST(req: NextRequest) {
       [negotiation_id, response, JSON.stringify(parsed)]
     );
 
+    // Determine which agent asked the question
+    const lastAgentRole = lastMsg?.role;
+
+    // Handle seller human responses
+    if (resolvedTarget === 'seller' && lastAgentRole === 'seller_agent') {
+      const promptQuestion = lastMsg?.parsed?.user_prompt?.question || '';
+
+      // Check if this is a min_price question (contains "minimum" or "lowest price")
+      const isMinPriceQ = /minim|lowest.*price|willing.*accept/i.test(promptQuestion);
+      if (isMinPriceQ) {
+        const priceMatch = response.match(/\$?\s*(\d[\d,]*\.?\d*)/);
+        if (priceMatch) {
+          const minPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
+          if (minPrice > 0 && !isNaN(minPrice)) {
+            await query<SellAgent>(
+              `UPDATE sell_agents SET min_price = $1 WHERE listing_id = $2`,
+              [minPrice, negotiation.listing_id]
+            );
+            console.log(`[human-response] Updated sell_agent min_price to ${minPrice} for listing ${negotiation.listing_id}`);
+          }
+        }
+      }
+
+      // Append ALL seller human responses to sell_agent internal_notes
+      const noteEntry = `[${new Date().toISOString().slice(0, 10)}] Q: ${promptQuestion}\nA: ${response}`;
+      await query<SellAgent>(
+        `UPDATE sell_agents SET internal_notes = COALESCE(internal_notes, '') || E'\n' || $1 WHERE listing_id = $2`,
+        [noteEntry, negotiation.listing_id]
+      );
+      console.log(`[human-response] Appended seller response to internal_notes for listing ${negotiation.listing_id}`);
+    }
+
+    // Handle buyer human responses -- append to buy_agent internal_notes
+    if (resolvedTarget === 'buyer' && lastAgentRole === 'buyer_agent') {
+      const promptQuestion = lastMsg?.parsed?.user_prompt?.question || '';
+      const noteEntry = `[${new Date().toISOString().slice(0, 10)}] Q: ${promptQuestion}\nA: ${response}`;
+      await query(
+        `UPDATE buy_agents SET internal_notes = COALESCE(internal_notes, '') || E'\n' || $1 WHERE id = $2`,
+        [noteEntry, negotiation.buy_agent_id]
+      );
+      console.log(`[human-response] Appended buyer response to internal_notes for buy_agent ${negotiation.buy_agent_id}`);
+    }
+
     // Route the ball to the agent that asked the question
     // If a buyer_agent asked -> ball goes to buyer (so buyer_agent continues)
     // If a seller_agent asked -> ball goes to seller (so seller_agent continues)
-    const lastAgentRole = lastMsg?.role;
     let newBall: 'buyer' | 'seller';
     if (lastAgentRole === 'seller_agent') {
       newBall = 'seller';

@@ -45,6 +45,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
     min_price: '',
     urgency: 'medium',
     agent_name: '',
+    internal_notes: '',
   });
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -179,6 +180,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         min_price: parseFloat(formData.min_price) || 0,
         urgency: formData.urgency,
         preferences: {},
+        internal_notes: formData.internal_notes || '',
       };
 
       const agentRes = authenticated

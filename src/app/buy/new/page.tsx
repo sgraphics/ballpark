@@ -24,6 +24,7 @@ export default function NewBuyAgentPage() {
     prompt: '',
     max_price: '',
     urgency: 'medium',
+    internal_notes: '',
   });
 
   const canSave = !!formData.name && !!formData.category;
@@ -39,6 +40,7 @@ export default function NewBuyAgentPage() {
         prompt: formData.prompt,
         max_price: parseFloat(formData.max_price) || 0,
         urgency: formData.urgency,
+        internal_notes: formData.internal_notes || '',
       };
 
       const res = authenticated

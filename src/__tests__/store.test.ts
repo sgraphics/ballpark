@@ -31,6 +31,7 @@ const makeBuyAgent = (overrides?: Partial<BuyAgent>): BuyAgent => ({
   max_price: 200,
   urgency: 'medium',
   status: 'active',
+  internal_notes: '',
   created_at: new Date().toISOString(),
   ...overrides,
 });
