@@ -266,7 +266,7 @@ export function StatusRail({ messages, listing, className = '', darkMode = false
         </span>
       </h3>
       {showHero && !darkMode && listing && <HeroThumbnail listing={listing} />}
-      <div className={`space-y-2 overflow-y-auto pr-1 ${darkMode ? 'max-h-none' : 'max-h-[500px]'}`}>
+      <div className={`space-y-2 overflow-y-auto pr-1 max-h-[70vh]`}>
         {[...messages].reverse().map((msg) => (
           <StatusCard key={msg.id} message={msg} darkMode={darkMode} />
         ))}
@@ -276,7 +276,7 @@ export function StatusRail({ messages, listing, className = '', darkMode = false
 
   if (darkMode) {
     return (
-      <div className={`bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 h-full overflow-y-auto ${className}`}>
+      <div className={`bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 h-full flex flex-col ${className}`}>
         {content}
       </div>
     );

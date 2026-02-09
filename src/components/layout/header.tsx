@@ -4,32 +4,70 @@ import { Search, Wallet, LogIn, LogOut } from 'lucide-react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export function Header() {
-  const { searchQuery, setSearchQuery, setCurrentUser } = useAppStore();
-  const { ready, authenticated, user, login, logout } = usePrivy();
+  const { searchQuery, setSearchQuery, setCurrentUser, currentUser } = useAppStore();
+  const { ready, authenticated, user, getAccessToken, login, logout } = usePrivy();
+  const syncedRef = useRef<string | null>(null);
 
+  // On sign-in, call server to create/update user with wallet fetched from Privy API
   useEffect(() => {
-    if (ready && authenticated && user) {
-      const walletAddress = user.wallet?.address || user.linkedAccounts?.find(
-        (a) => a.type === 'wallet'
-      )?.address || '';
-
-      setCurrentUser({
-        id: user.id,
-        privy_id: user.id,
-        wallet_address: walletAddress,
-        created_at: new Date().toISOString(),
-      });
-    } else if (ready && !authenticated) {
-      setCurrentUser(null);
+    if (!ready || !authenticated || !user) {
+      if (ready && !authenticated) setCurrentUser(null);
+      return;
     }
-  }, [ready, authenticated, user, setCurrentUser]);
 
-  const walletAddress = user?.wallet?.address || user?.linkedAccounts?.find(
-    (a) => a.type === 'wallet'
-  )?.address;
+    // Prevent duplicate syncs for the same Privy user
+    if (syncedRef.current === user.id) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token || cancelled) return;
+
+        const res = await fetch('/api/auth/sync', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!res.ok || cancelled) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.user) {
+          setCurrentUser({
+            id: data.user.id,
+            privy_id: data.user.privy_id,
+            wallet_address: data.user.wallet_address || '',
+            created_at: new Date().toISOString(),
+          });
+          syncedRef.current = user.id;
+        }
+      } catch (err) {
+        console.error('[header] Auth sync failed:', err);
+        // Fallback: set basic user info so the UI isn't stuck
+        if (!cancelled) {
+          setCurrentUser({
+            id: user.id,
+            privy_id: user.id,
+            wallet_address: '',
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [ready, authenticated, user, getAccessToken, setCurrentUser]);
+
+  const walletAddress = currentUser?.wallet_address || '';
 
   return (
     <header className="fixed top-0 left-60 right-0 h-14 bg-white/80 backdrop-blur-sm border-b border-bp-border z-30 flex items-center px-6 gap-4">

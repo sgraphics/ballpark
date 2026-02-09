@@ -23,6 +23,8 @@ interface DuelArenaProps {
   isSubmitting?: boolean;
   // Escrow
   escrow?: Escrow | null;
+  buyerWallet?: string | null;
+  sellerWallet?: string | null;
   onEscrowCreated?: (escrow: Escrow) => void;
   onStateChange?: (state: Negotiation['state']) => void;
 }
@@ -241,7 +243,7 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
         </div>
       )}
 
-      <div className="space-y-2 max-h-60 scrollbar-thin scrollbar-thumb-zinc-700">
+      <div className="space-y-2 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
         {offers.map((offer, i) => {
           const isBuyer = offer.side === 'buyer';
           const isLatest = i === 0;
@@ -422,6 +424,8 @@ export function DuelArena({
   onHumanResponse,
   isSubmitting,
   escrow,
+  buyerWallet,
+  sellerWallet,
   onEscrowCreated,
   onStateChange,
 }: DuelArenaProps) {
@@ -475,9 +479,15 @@ export function DuelArena({
   return (
     <div
       ref={arenaRef}
-      className={`relative bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden transition-opacity duration-500 ${
+      className={`relative rounded-2xl border border-zinc-800 overflow-hidden transition-opacity duration-500 ${
         mounted ? 'opacity-100' : 'opacity-0'
       } ${isFullscreen ? 'rounded-none flex flex-col h-screen' : ''}`}
+      style={{
+        backgroundColor: 'black',
+        backgroundImage: `url("/arena_background.png")`,
+        backgroundPosition: 'left top',
+        backgroundRepeat: 'no-repeat',
+      }}
     >
       {/* Background gradients */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,0.05)_0%,transparent_50%)]" />
@@ -490,15 +500,7 @@ export function DuelArena({
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <div className="flex items-center gap-4">
-            {/* Logo — no border */}
-            <div className="relative">
-              <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center">
-                <img src="/duel_arena_logo.png" alt="Duel Arena" className="w-full h-full object-contain" />
-              </div>
-              {isLive && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-              )}
-            </div>
+
             {/* Hero thumbnail */}
             {heroImage && (
               <div className="w-10 h-10 rounded-lg overflow-hidden border border-zinc-700 flex-shrink-0">
@@ -506,7 +508,7 @@ export function DuelArena({
               </div>
             )}
             <div>
-              <h2 className="font-heading text-lg text-white tracking-wide">DUEL ARENA</h2>
+              <h2 className="font-heading text-lg text-white tracking-wide">LIVE BALLPARK</h2>
               <p className="text-xs text-zinc-500">{listing.title}</p>
             </div>
           </div>
@@ -545,9 +547,9 @@ export function DuelArena({
         </div>
 
         {/* 2-column layout */}
-        <div className={`grid grid-cols-12 gap-4 ${isFullscreen ? 'flex-1 min-h-0' : ''}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 ${isFullscreen ? 'flex-1 min-h-0' : ''}`}>
           {/* Column 1: Offer Ladder */}
-          <div className={`col-span-7 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
+          <div className={`md:col-span-7 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
             <div className={`relative bg-zinc-900/50 rounded-xl p-5 border border-zinc-800 flex flex-col backdrop-blur-sm ${isFullscreen ? 'flex-1 min-h-0' : 'h-full'}`}>
               <HUDCorner position="tl" />
               <HUDCorner position="tr" />
@@ -594,7 +596,7 @@ export function DuelArena({
           </div>
 
           {/* Column 2: Prompt + Status + Status Rail — HUD styled */}
-          <div className={`col-span-5 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
+          <div className={`md:col-span-5 ${isFullscreen ? 'flex flex-col min-h-0' : ''}`}>
             <div className={`relative bg-zinc-900/50 rounded-xl p-5 border border-zinc-800 flex flex-col backdrop-blur-sm ${isFullscreen ? 'flex-1 min-h-0' : 'h-full'}`}>
               <HUDCorner position="tl" />
               <HUDCorner position="tr" />
@@ -613,6 +615,8 @@ export function DuelArena({
                       negotiation={negotiation}
                       escrow={escrow || null}
                       listingId={listing.id}
+                      buyerAddress={buyerWallet || undefined}
+                      sellerAddress={sellerWallet || undefined}
                       isOwner={true}
                       isBuyer={true}
                       isAdmin={false}

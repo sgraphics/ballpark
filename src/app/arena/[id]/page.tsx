@@ -20,6 +20,8 @@ export default function ArenaPage({ params }: ArenaPageProps) {
   const [sellAgent, setSellAgent] = useState<SellAgent | null>(null);
   const [messages, setMessages] = useState<NegMessage[]>([]);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
+  const [buyerWallet, setBuyerWallet] = useState<string | null>(null);
+  const [sellerWallet, setSellerWallet] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -51,18 +53,39 @@ export default function ArenaPage({ params }: ArenaPageProps) {
           escrowRes.json(),
         ]);
 
-        if (listingData.listings?.length > 0) {
-          setListing(listingData.listings[0]);
-        }
-        if (buyAgentData.agents?.length > 0) {
-          setBuyAgent(buyAgentData.agents[0]);
-        }
+        const loadedListing = listingData.listings?.[0] || null;
+        const loadedBuyAgent = buyAgentData.agents?.[0] || null;
+
+        if (loadedListing) setListing(loadedListing);
+        if (loadedBuyAgent) setBuyAgent(loadedBuyAgent);
         if (sellAgentData.agents?.length > 0) {
           setSellAgent(sellAgentData.agents[0]);
         }
         setMessages(messagesData.messages || []);
         if (escrowData.escrows?.length > 0) {
           setEscrow(escrowData.escrows[0]);
+        }
+
+        // Fetch wallet addresses for buyer and seller
+        const userIds = new Set<string>();
+        if (loadedBuyAgent?.user_id) userIds.add(loadedBuyAgent.user_id);
+        if (loadedListing?.seller_user_id) userIds.add(loadedListing.seller_user_id);
+
+        if (userIds.size > 0) {
+          try {
+            const walletRes = await fetch(`/api/users/wallet?user_ids=${[...userIds].join(',')}`);
+            const walletData = await walletRes.json();
+            if (walletData.wallets) {
+              if (loadedBuyAgent?.user_id) {
+                setBuyerWallet(walletData.wallets[loadedBuyAgent.user_id] || null);
+              }
+              if (loadedListing?.seller_user_id) {
+                setSellerWallet(walletData.wallets[loadedListing.seller_user_id] || null);
+              }
+            }
+          } catch {
+            console.error('Failed to fetch wallet addresses');
+          }
         }
       }
     } catch (err) {
@@ -296,11 +319,13 @@ export default function ArenaPage({ params }: ArenaPageProps) {
           sellAgent={sellAgent}
           negotiation={negotiation}
           messages={messages}
-            onRunStep={handleRunStep}
-            isRunning={running}
+          onRunStep={handleRunStep}
+          isRunning={running}
           onHumanResponse={handleHumanResponse}
           isSubmitting={submitting}
           escrow={escrow}
+          buyerWallet={buyerWallet}
+          sellerWallet={sellerWallet}
           onEscrowCreated={(esc) => setEscrow(esc)}
           onStateChange={(newState) => {
             setNegotiation(prev => prev ? { ...prev, state: newState } : null);

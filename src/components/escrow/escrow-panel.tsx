@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Shield,
   Wallet,
@@ -12,6 +12,7 @@ import {
   Unlock,
   Coins,
 } from 'lucide-react';
+import { useWallets } from '@privy-io/react-auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,12 +25,11 @@ import {
   flagIssue,
   parseUSDC,
   getSignerFromPrivy,
-  mockCreateEscrow,
-  mockDeposit,
-  mockConfirm,
-  mockFlag,
 } from '@/lib/escrow';
 import type { Negotiation, Escrow } from '@/types/database';
+
+/** Base chain ID */
+const BASE_CHAIN_ID = 8453;
 
 interface EscrowPanelProps {
   negotiation: Negotiation;
@@ -40,7 +40,6 @@ interface EscrowPanelProps {
   isOwner: boolean;
   isBuyer: boolean;
   isAdmin: boolean;
-  privyProvider?: unknown;
   onEscrowCreated?: (escrow: Escrow) => void;
   onStateChange?: (state: Negotiation['state']) => void;
 }
@@ -56,18 +55,40 @@ export function EscrowPanel({
   isOwner,
   isBuyer,
   isAdmin,
-  privyProvider,
   onEscrowCreated,
   onStateChange,
 }: EscrowPanelProps) {
   const [loading, setLoading] = useState<EscrowAction>(null);
   const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
+  const { wallets } = useWallets();
 
   const configured = isEscrowConfigured();
   const state = negotiation.state;
   const agreedPrice = negotiation.agreed_price || 0;
   const usdcAmount = escrow?.usdc_amount || agreedPrice;
+
+  /**
+   * Get an ethers.js signer from the Privy embedded wallet.
+   * Ensures the wallet is switched to Base chain before returning.
+   */
+  const getWalletSigner = useCallback(async () => {
+    const embeddedWallet = wallets.find(w => w.walletClientType === 'privy');
+    if (!embeddedWallet) {
+      throw new Error('No embedded wallet found — please sign in first');
+    }
+
+    // Ensure we're on Base chain
+    const currentChainId = parseInt(embeddedWallet.chainId.split(':')[1] || '0', 10);
+    if (currentChainId !== BASE_CHAIN_ID) {
+      await embeddedWallet.switchChain(BASE_CHAIN_ID);
+    }
+
+    const provider = await embeddedWallet.getEthereumProvider();
+    const signer = await getSignerFromPrivy(provider);
+    if (!signer) throw new Error('Could not get signer from wallet');
+    return signer;
+  }, [wallets]);
 
   const handleCreateEscrow = async () => {
     if (!buyerAddress) {
@@ -79,36 +100,22 @@ export function EscrowPanel({
     setError(null);
 
     try {
-      let txHash = '';
+      const signer = await getWalletSigner();
 
-      let contractItemId = '';
-
-      if (configured && privyProvider) {
-        const signer = await getSignerFromPrivy(privyProvider);
-        if (!signer) throw new Error('Could not get signer from wallet');
-
-        const { createEscrow } = await import('@/lib/escrow');
-        const priceOnChain = parseUSDC(agreedPrice);
-        const result = await createEscrow(signer, negotiation.id, priceOnChain, buyerAddress);
-        txHash = result.txHash;
-        contractItemId = result.contractItemId;
-      } else {
-        const result = await mockCreateEscrow(negotiation.id, parseUSDC(agreedPrice), buyerAddress);
-        if (!result.success) throw new Error(result.error || 'Failed to create escrow');
-        txHash = result.txHash;
-        contractItemId = result.contractItemId;
-      }
+      const { createEscrow } = await import('@/lib/escrow');
+      const priceOnChain = parseUSDC(agreedPrice);
+      const result = await createEscrow(signer, negotiation.id, priceOnChain, buyerAddress);
 
       const res = await fetch('/api/escrow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           negotiation_id: negotiation.id,
-          item_id: contractItemId,
+          item_id: result.contractItemId,
           buyer_wallet: buyerAddress,
           seller_wallet: sellerAddress,
           usdc_amount: agreedPrice,
-          tx_create: txHash,
+          tx_create: result.txHash,
         }),
       });
 
@@ -131,16 +138,9 @@ export function EscrowPanel({
     setError(null);
 
     try {
-      if (configured && privyProvider) {
-        const signer = await getSignerFromPrivy(privyProvider);
-        if (!signer) throw new Error('Could not get signer from wallet');
-
-        const amount = parseUSDC(usdcAmount);
-        await approveUSDC(signer, amount);
-      } else {
-        // Mock: simulate approval delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      const signer = await getWalletSigner();
+      const amount = parseUSDC(usdcAmount);
+      await approveUSDC(signer, amount);
       setApproved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve USDC');
@@ -154,20 +154,10 @@ export function EscrowPanel({
     setError(null);
 
     try {
-      let txHash = '';
-
       if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
 
-      if (configured && privyProvider) {
-        const signer = await getSignerFromPrivy(privyProvider);
-        if (!signer) throw new Error('Could not get signer from wallet');
-
-        txHash = await depositToEscrow(signer, escrow.item_id);
-      } else {
-        const result = await mockDeposit(escrow.item_id);
-        if (!result.success) throw new Error(result.error || 'Failed to deposit');
-        txHash = result.txHash;
-      }
+      const signer = await getWalletSigner();
+      const txHash = await depositToEscrow(signer, escrow.item_id);
 
       const res = await fetch('/api/escrow', {
         method: 'PATCH',
@@ -195,19 +185,10 @@ export function EscrowPanel({
     setError(null);
 
     try {
-      let txHash = '';
-
       if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
 
-      if (configured && privyProvider) {
-        const signer = await getSignerFromPrivy(privyProvider);
-        if (!signer) throw new Error('Could not get signer from wallet');
-        txHash = await confirmDelivery(signer, escrow.item_id);
-      } else {
-        const result = await mockConfirm(escrow.item_id);
-        if (!result.success) throw new Error(result.error || 'Failed to confirm');
-        txHash = result.txHash;
-      }
+      const signer = await getWalletSigner();
+      const txHash = await confirmDelivery(signer, escrow.item_id);
 
       const res = await fetch('/api/escrow', {
         method: 'PATCH',
@@ -235,19 +216,10 @@ export function EscrowPanel({
     setError(null);
 
     try {
-      let txHash = '';
-
       if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
 
-      if (configured && privyProvider) {
-        const signer = await getSignerFromPrivy(privyProvider);
-        if (!signer) throw new Error('Could not get signer from wallet');
-        txHash = await flagIssue(signer, escrow.item_id);
-      } else {
-        const result = await mockFlag(escrow.item_id);
-        if (!result.success) throw new Error(result.error || 'Failed to flag');
-        txHash = result.txHash;
-      }
+      const signer = await getWalletSigner();
+      const txHash = await flagIssue(signer, escrow.item_id);
 
       const res = await fetch('/api/escrow', {
         method: 'PATCH',
@@ -346,7 +318,7 @@ export function EscrowPanel({
 
         {!configured && (
           <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">
-            Demo Mode — No real transactions
+            Escrow contract not configured
           </Badge>
         )}
       </div>
@@ -520,7 +492,7 @@ function TxRow({ label, hash, colorClass }: { label: string; hash: string; color
     <div className="flex items-center justify-between">
       <span className="text-zinc-500">{label}</span>
       <a
-        href={`https://etherscan.io/tx/${hash}`}
+        href={`https://basescan.org/tx/${hash}`}
         target="_blank"
         rel="noopener noreferrer"
         className={`flex items-center gap-1 ${colorClass} hover:underline`}

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createRemoteJWKSet } from 'jose';
 import { query } from './db';
+import { fetchWalletFromPrivy } from './privy-client';
 import type { User } from '@/types/database';
 
 let privyJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -28,28 +29,47 @@ function getPrivyJWKS(appId: string) {
   return privyJWKS;
 }
 
-export async function getOrCreateUser(privyId: string, walletAddress?: string): Promise<string> {
+export interface SyncedUser {
+  id: string;
+  privy_id: string;
+  wallet_address: string | null;
+}
+
+/**
+ * Find or create a user by Privy DID. If the wallet_address is missing in the DB,
+ * it is automatically fetched from the Privy API (server-side, trusted).
+ */
+export async function getOrCreateUser(privyId: string, walletAddress?: string): Promise<SyncedUser> {
   const existing = await query<User>(
-    'SELECT id, wallet_address FROM users WHERE privy_id = $1',
+    'SELECT id, privy_id, wallet_address FROM users WHERE privy_id = $1',
     [privyId]
   );
 
   if (existing.rows.length > 0) {
-    if (walletAddress && !existing.rows[0].wallet_address) {
-      await query(
-        'UPDATE users SET wallet_address = $1 WHERE id = $2',
-        [walletAddress, existing.rows[0].id]
-      );
+    const row = existing.rows[0];
+    // Back-fill wallet_address from Privy if we don't have one yet
+    if (!row.wallet_address) {
+      const wallet = walletAddress || await fetchWalletFromPrivy(privyId);
+      if (wallet) {
+        await query(
+          'UPDATE users SET wallet_address = $1 WHERE id = $2',
+          [wallet, row.id]
+        );
+        return { id: row.id, privy_id: privyId, wallet_address: wallet };
+      }
     }
-    return existing.rows[0].id;
+    return { id: row.id, privy_id: privyId, wallet_address: row.wallet_address || null };
   }
+
+  // New user: fetch wallet from Privy if not provided by the caller
+  const wallet = walletAddress || await fetchWalletFromPrivy(privyId);
 
   const result = await query<User>(
     'INSERT INTO users (privy_id, wallet_address) VALUES ($1, $2) RETURNING id',
-    [privyId, walletAddress || null]
+    [privyId, wallet || null]
   );
 
-  return result.rows[0].id;
+  return { id: result.rows[0].id, privy_id: privyId, wallet_address: wallet || null };
 }
 
 export async function verifyPrivyToken(authHeader: string | null): Promise<string | null> {
@@ -100,7 +120,8 @@ export async function getUserIdFromRequest(req: NextRequest): Promise<string | n
   }
 
   try {
-    return await getOrCreateUser(privyId);
+    const user = await getOrCreateUser(privyId);
+    return user.id;
   } catch (err) {
     console.error('Failed to get or create user:', err);
     return null;
