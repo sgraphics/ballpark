@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { CATEGORIES, getCategoryFields, type CategoryField } from '@/types/categories';
+import { CATEGORIES } from '@/types/categories';
 import type { ImageAnalysisResult } from '@/lib/gemini';
 import type { ConditionNote } from '@/types/database';
 
@@ -27,19 +26,8 @@ interface ConfirmFormProps {
 }
 
 export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) {
-  const [fields, setFields] = useState<CategoryField[]>([]);
-
-  useEffect(() => {
-    const f = getCategoryFields(formData.category);
-    setFields(f);
-  }, [formData.category]);
-
   const update = (key: keyof ListingFormData, value: unknown) => {
     onChange({ ...formData, [key]: value });
-  };
-
-  const updateStructured = (key: string, value: string) => {
-    onChange({ ...formData, structured: { ...formData.structured, [key]: value } });
   };
 
   const categoryOptions = CATEGORIES.map((c) => ({ value: c.id, label: c.name }));
@@ -57,7 +45,9 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
           />
 
           <div>
-            <label className="block text-sm font-medium text-bp-muted mb-1 font-body">Description</label>
+            <label className="block text-sm font-medium text-bp-muted mb-1 font-body">
+              Description <span className="text-bp-muted-light">(optional — AI filled this for you)</span>
+            </label>
             <textarea
               value={formData.description}
               onChange={(e) => update('description', e.target.value)}
@@ -90,44 +80,9 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
         </div>
       </div>
 
-      {fields.length > 0 && (
-        <div>
-          <h3 className="font-heading text-base mb-4">Category Details</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {fields.map((field) =>
-              field.type === 'select' && field.options ? (
-                <Select
-                  key={field.key}
-                  label={field.label + (field.required ? ' *' : '')}
-                  value={formData.structured[field.key] || ''}
-                  onChange={(e) => updateStructured(field.key, e.target.value)}
-                  options={field.options.map((o) => ({ value: o, label: o }))}
-                  placeholder={`Select ${field.label.toLowerCase()}`}
-                />
-              ) : (
-                <Input
-                  key={field.key}
-                  label={field.label + (field.required ? ' *' : '')}
-                  type={field.type === 'number' ? 'number' : 'text'}
-                  value={formData.structured[field.key] || ''}
-                  onChange={(e) => updateStructured(field.key, e.target.value)}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
-                />
-              )
-            )}
-          </div>
-        </div>
-      )}
-
       <div>
         <h3 className="font-heading text-base mb-4">Sell Agent Settings</h3>
         <div className="space-y-4">
-          <Input
-            label="Agent Name"
-            value={formData.agent_name}
-            onChange={(e) => update('agent_name', e.target.value)}
-            placeholder="My Sell Agent"
-          />
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Minimum Acceptable Price ($)"

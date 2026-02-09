@@ -176,7 +176,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
 
       const agentPayload = {
         listing_id: listing.id,
-        name: formData.agent_name || `Agent: ${formData.title}`,
+        name: `Agent: ${formData.title}`,
         min_price: parseFloat(formData.min_price) || 0,
         urgency: formData.urgency,
         preferences: {},

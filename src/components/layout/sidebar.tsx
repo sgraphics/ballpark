@@ -28,9 +28,12 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 w-60 h-screen bg-white border-r border-bp-border z-40 flex flex-col">
       <div className="p-5 border-b border-bp-border">
         <Link href="/" onClick={() => setSidebarTab('feed')}>
-          <h1 className="font-heading text-xl font-bold italic tracking-tight">
-            ballpark
-          </h1>
+          <img
+            src="/logo.png"
+            alt="ballpark logo"
+            className="h-6 w-auto mb-1"
+            style={{ display: 'inline-block' }}
+          />
           <p className="text-[10px] text-bp-muted tracking-widest uppercase mt-0.5">
             agentic marketplace
           </p>

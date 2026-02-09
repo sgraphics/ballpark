@@ -32,6 +32,18 @@ Negotiation rules:
 6. You may ONLY ask questions from the BUYER human (target: "buyer"). NEVER set target to "seller"
 7. You can freely converse with the seller agent without involving humans
 
+CRITICAL -- price_proposal field rules:
+- price_proposal is how the system detects agreement. You MUST set it correctly.
+- When you make an offer: set price_proposal to your offered price.
+- When you ACCEPT the other side's price: set price_proposal to THEIR price (the one you accept).
+- NEVER set price_proposal to null when accepting or offering. null means "no price action this turn" (questions only).
+- Agreement happens when your price_proposal meets or exceeds the seller's last price. If you want to close the deal, set price_proposal to the seller's last proposed price.
+
+CRITICAL -- Consulting your human:
+- You have made {buyer_counter_count} counter-offers so far.
+- If you have made 3 or more counter-offers and the seller is not moving much, you MUST ask your human buyer whether they accept the seller's current price via user_prompt. Do NOT keep raising your offer indefinitely.
+- When asking, set target to "buyer", include the current seller price in the question, and leave choices as: ["Accept this price", "Reject and walk away", "Let me set a new max"]
+
 Output ONLY valid JSON matching this schema:
 {
   "answer": "Your response to the seller (1-3 sentences)",
@@ -45,7 +57,7 @@ const SELLER_SYSTEM_PROMPT = `You are a seller agent negotiating on behalf of a 
 
 Your constraints:
 - Ask price: {ask_price}
-- Min acceptable price: {min_price}
+- Min acceptable price: {min_price}  (this is your FLOOR -- the absolute lowest you can go. Try to sell WELL ABOVE this.)
 - Has min price set: {has_min_price}
 - Urgency: {urgency}
 
@@ -55,20 +67,28 @@ Negotiation rules:
    - If the issue was ALREADY visible in photos or listed in condition notes, push back firmly ("This was already reflected in the asking price")
    - Only concede for legitimate hidden issues discovered through questioning
 3. Defend the ask price using condition notes and haggling_ammo -- highlight positives
-4. Counter offers strategically, lowering gradually based on urgency
+4. Counter offers strategically: start near ask_price and lower GRADUALLY. Your min_price is a last resort, NOT your opening counter.
+   - Example: if ask is $200 and min is $90, counter at $180, then $160, then $140, etc. Do NOT jump to $90.
 5. NEVER invent facts not provided in the listing data or your internal_notes
 6. You may ONLY ask questions from the SELLER human (target: "seller"). NEVER set target to "buyer"
 7. You can freely converse with the buyer agent without involving humans
 
 CRITICAL -- Min price enforcement:
 - If has_min_price is false (no min price set by seller), you MUST ask your seller for their minimum acceptable price via user_prompt BEFORE accepting or countering any price below the ask price. The question should ask for a specific dollar amount. Do NOT provide choices -- leave choices empty so the seller can type a number.
-- If has_min_price is true, NEVER ask the seller for input about pricing. Handle all price negotiations autonomously: counter above min_price, reject firmly if the buyer won't go above it.
+- If has_min_price is true, NEVER ask the seller for input about pricing. Handle all price negotiations autonomously. Your min_price is your FLOOR -- try to get the BEST price above it, not immediately offer the minimum.
 
 CRITICAL -- Knowledge gaps:
 - When the buyer asks a question you CANNOT answer from the listing data, condition_notes, haggling_ammo, or your internal_notes, you MUST ask the human seller via user_prompt. Do NOT guess or make up answers.
 - Especially if the answer could significantly lower the price (e.g. repair history, hidden damage, reason for selling), you MUST consult the seller first.
 - When asking the seller, leave choices as an empty array so they can type a full answer.
 - The seller's answer will be added to your internal notes for future reference.
+
+CRITICAL -- price_proposal field rules:
+- price_proposal is how the system detects agreement. You MUST set it correctly.
+- When you make a counter-offer: set price_proposal to your counter price.
+- When you ACCEPT the buyer's price: set price_proposal to THEIR price (the one you accept).
+- NEVER set price_proposal to null when accepting or countering. null means "no price action this turn" (questions only).
+- Agreement happens when your price_proposal drops to or below the buyer's last price. If you want to close the deal, set price_proposal to the buyer's last proposed price.
 
 Output ONLY valid JSON matching this schema:
 {
@@ -101,10 +121,18 @@ function countTurns(messages: NegMessage[], role: 'buyer_agent' | 'seller_agent'
   return messages.filter(m => m.role === role).length;
 }
 
+/** Count how many price counter-offers the buyer has made (turns with a price_proposal). */
+function countBuyerCounterOffers(messages: NegMessage[]): number {
+  return messages.filter(m =>
+    m.role === 'buyer_agent' && m.parsed?.price_proposal != null
+  ).length;
+}
+
 function buildBuyerPrompt(ctx: OrchestrationContext): string {
   const { listing, buyAgent, messages } = ctx;
 
   const buyerTurn = countTurns(messages, 'buyer_agent') + 1; // next turn number
+  const buyerCounterCount = countBuyerCounterOffers(messages);
 
   const history = messages.map(m => {
     const parsed = m.parsed || {} as ParsedMessage;
@@ -126,10 +154,12 @@ function buildBuyerPrompt(ctx: OrchestrationContext): string {
   return `${BUYER_SYSTEM_PROMPT
     .replace('{max_price}', `$${buyAgent.max_price}`)
     .replace('{preferences}', buyAgent.prompt || 'None specified')
-    .replace('{urgency}', buyAgent.urgency)}
+    .replace('{urgency}', buyAgent.urgency)
+    .replace('{buyer_counter_count}', String(buyerCounterCount))}
 
 YOUR TURN NUMBER: ${buyerTurn}
 PHASE: ${buyerTurn <= 3 ? 'DISCOVERY (ask questions, do NOT propose price)' : 'NEGOTIATION (propose/counter prices with reasoning)'}
+COUNTER-OFFERS MADE SO FAR: ${buyerCounterCount}${buyerCounterCount >= 3 ? ' — YOU MUST consult your human buyer before making another counter-offer.' : ''}
 ${buyerNotes ? `\nINTERNAL NOTES (private, not shared with seller):\n${buyerNotes}` : ''}
 
 LISTING:
@@ -180,7 +210,7 @@ function buildSellerPrompt(ctx: OrchestrationContext): string {
   if (!hasMinPrice) {
     minPriceWarning = '\nWARNING: No minimum price has been set by the seller. You MUST ask your seller for their minimum acceptable price (a specific dollar amount) via user_prompt before accepting or countering below ask price. Do NOT include choices -- leave choices as an empty array so the seller can type a number.';
   } else if (buyerLastPrice !== null && buyerLastPrice < minPrice) {
-    minPriceWarning = `\nNOTE: Buyer's latest offer ($${buyerLastPrice}) is BELOW your min price ($${minPrice}). Counter at or above $${minPrice} or reject. Do NOT ask the seller -- handle this autonomously.`;
+    minPriceWarning = `\nNOTE: Buyer's latest offer ($${buyerLastPrice}) is BELOW your min price floor ($${minPrice}). Counter WELL ABOVE $${minPrice} -- your min is the absolute last resort, not your counter-offer. Try to close closer to $${listing.ask_price}. Negotiate gradually downward from ask price. Do NOT ask the seller -- handle this autonomously.`;
   }
 
   return `${SELLER_SYSTEM_PROMPT
@@ -255,24 +285,20 @@ function checkAgreement(
     return { isAgreed: false, agreedPrice: null };
   }
 
-  const lastOtherMessage = [...ctx.messages].reverse().find(m =>
-    (role === 'buyer_agent' && m.role === 'seller_agent') ||
-    (role === 'seller_agent' && m.role === 'buyer_agent')
-  );
+  const otherRole = role === 'buyer_agent' ? 'seller_agent' : 'buyer_agent';
+  const lastOtherPrice = [...ctx.messages].reverse()
+    .find(m => m.role === otherRole && m.parsed?.price_proposal != null)
+    ?.parsed?.price_proposal ?? null;
 
-  const otherParsed = lastOtherMessage?.parsed || {} as ParsedMessage;
-  if (!otherParsed.price_proposal) {
+  if (lastOtherPrice === null) {
     return { isAgreed: false, agreedPrice: null };
   }
 
-  if (role === 'buyer_agent') {
-    if (newMessage.price_proposal >= otherParsed.price_proposal) {
-      return { isAgreed: true, agreedPrice: otherParsed.price_proposal };
-    }
-  } else {
-    if (newMessage.price_proposal <= otherParsed.price_proposal) {
-      return { isAgreed: true, agreedPrice: otherParsed.price_proposal };
-    }
+  if (role === 'buyer_agent' && newMessage.price_proposal >= lastOtherPrice) {
+    return { isAgreed: true, agreedPrice: lastOtherPrice };
+  }
+  if (role === 'seller_agent' && newMessage.price_proposal <= lastOtherPrice) {
+    return { isAgreed: true, agreedPrice: lastOtherPrice };
   }
 
   return { isAgreed: false, agreedPrice: null };
@@ -381,10 +407,11 @@ export function generateDemoResponse(
         choices: [],
       };
     } else if (hasMinPrice && lastPrice < minPrice) {
-      // Min price IS set, buyer below it -- counter autonomously at min_price
-      price = minPrice;
-      answer = `I appreciate the offer, but I can't go that low. The lowest I can accept is $${minPrice}, which already accounts for the item's condition.`;
-      statusMessage = `Countered at minimum: $${minPrice}`;
+      // Min price IS set, buyer below it -- counter well above min_price (not at it)
+      const counter = Math.round(askPrice - (askPrice - minPrice) * 0.3);
+      price = counter;
+      answer = `I appreciate the offer, but I can't go that low. The item's condition and quality justify $${counter}. I've already priced it fairly.`;
+      statusMessage = `Countered at $${counter}`;
     } else {
       price = Math.round(lastPrice + (askPrice - lastPrice) * 0.5);
       answer = `I appreciate the offer. The issues you mentioned were already factored into the asking price. I could meet you at $${price}.`;
