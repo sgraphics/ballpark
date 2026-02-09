@@ -226,6 +226,21 @@ const migrations: Migration[] = [
       END $$;
     `,
   },
+  {
+    id: '015',
+    name: 'add_buy_agent_status',
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'buy_agents' AND column_name = 'status'
+        ) THEN
+          ALTER TABLE buy_agents ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations(): Promise<{ applied: string[]; skipped: string[] }> {

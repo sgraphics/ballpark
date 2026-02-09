@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
           listing_title: listing.title,
           status_message: `${agentRole} agent is thinking...`,
           agent_role: agentRole.toLowerCase(),
+          ball: negotiation.ball,
         }),
       ]
     );
@@ -157,6 +158,7 @@ export async function POST(req: NextRequest) {
           status_message: result.parsed.status_message,
           agreed_price: result.agreedPrice,
           user_prompt: result.parsed.user_prompt,
+          ball: result.newBall,
         }),
       ]
     );

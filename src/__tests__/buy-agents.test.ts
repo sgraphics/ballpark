@@ -12,6 +12,7 @@ const makeBuyAgent = (overrides?: Partial<BuyAgent>): BuyAgent => ({
   prompt: 'Looking for vintage jackets',
   max_price: 500,
   urgency: 'medium',
+  status: 'active',
   created_at: new Date().toISOString(),
   ...overrides,
 });

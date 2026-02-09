@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { TurnBadge } from '@/components/negotiation/turn-indicator';
 import { formatRelativeTime, formatPrice } from '@/lib/utils';
-import type { AppEvent, EventType } from '@/types/database';
+import type { AppEvent, EventType, BallOwner, NegotiationState } from '@/types/database';
 
 const eventConfig: Record<EventType, {
   icon: typeof Plus;
@@ -60,6 +61,15 @@ export function EventCard({ event, compact = false, showThumbnail = false }: Eve
   const message = typeof p.status_message === 'string' ? p.status_message : (typeof p.message === 'string' ? p.message : null);
   const price = typeof p.price_proposal === 'number' ? p.price_proposal : (typeof p.price === 'number' ? p.price : null);
   const thumbnail = showThumbnail && typeof p.thumbnail_url === 'string' ? p.thumbnail_url : null;
+  const ball = typeof p.ball === 'string' ? (p.ball as BallOwner) : null;
+
+  // Determine negotiation state from event type for turn badge
+  const negotiationEventTypes: EventType[] = [
+    'negotiation_started', 'agent_processing', 'buyer_proposes',
+    'seller_counters', 'human_input_required',
+  ];
+  const isNegotiationEvent = negotiationEventTypes.includes(event.type);
+  const inferredState: NegotiationState = event.type === 'deal_agreed' ? 'agreed' : 'negotiating';
 
   const link =
     typeof p.negotiation_id === 'string'
@@ -86,6 +96,11 @@ export function EventCard({ event, compact = false, showThumbnail = false }: Eve
           {message && <p className="text-xs text-bp-muted mt-0.5 line-clamp-2">{message}</p>}
           {price !== null && (
             <p className="text-sm font-medium mt-1">{formatPrice(price)}</p>
+          )}
+          {isNegotiationEvent && ball && (
+            <div className="mt-1.5">
+              <TurnBadge ball={ball} state={inferredState} />
+            </div>
           )}
         </div>
       </div>

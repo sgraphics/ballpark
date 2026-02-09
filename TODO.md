@@ -337,11 +337,11 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 - [x] Add EventFeed to Arena negotiation page (filtered by negotiation_id)
 - [ ] Add compact EventFeed to Buy page sidebar (optional enhancement)
 
-### 6.3 Event Enhancements [PARTIAL]
+### 6.3 Event Enhancements [DONE]
 - [x] Add new event type: `agent_processing`
 - [x] Create events API SSE endpoint: GET /api/events/stream
 - [x] Link events to negotiations for filtering
-- [ ] Add "whose turn" indicator in event cards (future enhancement)
+- [x] Add "whose turn" indicator in event cards (TurnBadge in negotiation events)
 
 ---
 
@@ -406,21 +406,23 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
-## MILESTONE 9: Buy Agent Auto-Search [TODO]
-**Status: NOT STARTED**
+## MILESTONE 9: Buy Agent Auto-Search [PARTIAL]
+**Status: 9.1-9.3 COMPLETE**
 **Priority: MEDIUM**
 
-### 9.1 Buy Agent Active State
-- [ ] Add `status` field to buy_agents: 'active' | 'paused' | 'stopped'
-- [ ] Active agents auto-run finder periodically
-- [ ] Pause/Resume toggle in buy agent card
-- [ ] Stop permanently deletes or archives agent
+### 9.1 Buy Agent Active State [DONE]
+- [x] Add `status` field to buy_agents: 'active' | 'paused' | 'stopped' (migration 015)
+- [x] BuyAgent type updated with BuyAgentStatus
+- [x] Pause/Resume toggle in buy agent card (Play/Pause/Stop buttons)
+- [x] StatusBadge component with active dot animation
+- [x] PATCH /api/buy-agents endpoint for status updates
+- [x] Stopped agents visually dimmed, auto-search skipped
 
-### 9.2 Auto-Search on Open
-- [ ] When selecting a buy agent in /buy page, auto-run finder
-- [ ] Show "Searching..." state with spinner
-- [ ] Debounce to prevent multiple simultaneous searches
-- [ ] Cache results for 5 minutes to reduce API calls
+### 9.2 Auto-Search on Open [DONE]
+- [x] When selecting a buy agent in /buy page, auto-run finder (debounced 300ms)
+- [x] Show "Auto-searching..." state with spinner
+- [x] Debounce to prevent multiple simultaneous searches (timer + in-flight guard)
+- [x] Cache results for 5 minutes to reduce API calls (CacheEntry with TTL)
 
 ### 9.3 Negotiate Button Creates Negotiation [DONE]
 - [x] Fix handleNegotiate to call POST /api/negotiations

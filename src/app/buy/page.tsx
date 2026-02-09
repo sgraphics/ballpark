@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus, Search, Bot, RefreshCw, Inbox, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { BuyAgentCard } from '@/components/buy/buy-agent-card';
 import { MatchCard } from '@/components/buy/match-card';
 import { useAppStore } from '@/store/app-store';
+import type { BuyAgentStatus } from '@/types/database';
 
 interface EnrichedMatch {
   id: string;
@@ -26,16 +27,30 @@ interface EnrichedMatch {
   listing_condition_notes?: { issue: string; confidence: 'high' | 'medium' | 'low' }[];
 }
 
+interface CacheEntry {
+  matches: EnrichedMatch[];
+  timestamp: number;
+}
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export default function BuyAgentsPage() {
   const router = useRouter();
   const { buyAgents, setBuyAgents } = useAppStore();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);
   const [running, setRunning] = useState(false);
+  const [autoSearching, setAutoSearching] = useState(false);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   const [actionLoading, setActionLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(false);
+
+  // Cache for finder results keyed by agent ID
+  const matchCacheRef = useRef<Record<string, CacheEntry>>({});
+  // Debounce ref to prevent concurrent auto-searches
+  const autoSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSearchInFlightRef = useRef<string | null>(null);
 
   // Fetch buy agents from API on mount
   useEffect(() => {
@@ -84,7 +99,14 @@ export default function BuyAgentsPage() {
     try {
       const res = await fetch(`/api/matches?buy_agent_id=${agentId}`);
       const data = await res.json();
-      setMatches(data.matches || []);
+      const fetchedMatches = data.matches || [];
+      setMatches(fetchedMatches);
+
+      // Update cache
+      matchCacheRef.current[agentId] = {
+        matches: fetchedMatches,
+        timestamp: Date.now(),
+      };
     } catch (err) {
       console.error('Failed to load matches:', err);
       setMatches([]);
@@ -93,10 +115,92 @@ export default function BuyAgentsPage() {
     }
   }, []);
 
+  // Auto-search: run finder when selecting an agent
+  const runAutoSearch = useCallback(async (agentId: string) => {
+    // Check if agent is active
+    const agent = buyAgents.find(a => a.id === agentId);
+    if (!agent || (agent.status || 'active') !== 'active') return;
+
+    // Check cache - skip if fresh results exist
+    const cached = matchCacheRef.current[agentId];
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+      return; // Cache is still fresh, skip auto-search
+    }
+
+    // Prevent duplicate concurrent searches for same agent
+    if (autoSearchInFlightRef.current === agentId) return;
+    autoSearchInFlightRef.current = agentId;
+    setAutoSearching(true);
+
+    try {
+      const res = await fetch('/api/finder/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buy_agent_id: agentId }),
+      });
+
+      const finderData = await res.json();
+
+      // If we got new matches, refresh the matches list
+      if (finderData.total_matched > 0 || !cached) {
+        const matchRes = await fetch(`/api/matches?buy_agent_id=${agentId}`);
+        const matchData = await matchRes.json();
+        const newMatches = matchData.matches || [];
+
+        // Only update if this agent is still selected
+        setSelectedAgentId(current => {
+          if (current === agentId) {
+            setMatches(newMatches);
+          }
+          return current;
+        });
+
+        // Update cache
+        matchCacheRef.current[agentId] = {
+          matches: newMatches,
+          timestamp: Date.now(),
+        };
+
+        // Update match count
+        setMatchCounts(prev => ({
+          ...prev,
+          [agentId]: newMatches.filter((m: EnrichedMatch) => m.status === 'potential').length,
+        }));
+      } else {
+        // No new matches found, just update cache timestamp
+        if (cached) {
+          cached.timestamp = Date.now();
+        }
+      }
+    } catch (err) {
+      console.error('Auto-search failed:', err);
+    } finally {
+      autoSearchInFlightRef.current = null;
+      setAutoSearching(false);
+    }
+  }, [buyAgents]);
+
   const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
     fetchMatchesForAgent(agentId);
-  }, [fetchMatchesForAgent]);
+
+    // Debounced auto-search (300ms delay to avoid rapid-fire)
+    if (autoSearchTimerRef.current) {
+      clearTimeout(autoSearchTimerRef.current);
+    }
+    autoSearchTimerRef.current = setTimeout(() => {
+      runAutoSearch(agentId);
+    }, 300);
+  }, [fetchMatchesForAgent, runAutoSearch]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSearchTimerRef.current) {
+        clearTimeout(autoSearchTimerRef.current);
+      }
+    };
+  }, []);
 
   // Auto-select first agent once loaded
   useEffect(() => {
@@ -121,11 +225,18 @@ export default function BuyAgentsPage() {
       // Refresh matches for the selected agent
       const matchRes = await fetch(`/api/matches?buy_agent_id=${selectedAgentId}`);
       const matchData = await matchRes.json();
-      setMatches(matchData.matches || []);
+      const newMatches = matchData.matches || [];
+      setMatches(newMatches);
+
+      // Update cache
+      matchCacheRef.current[selectedAgentId] = {
+        matches: newMatches,
+        timestamp: Date.now(),
+      };
 
       setMatchCounts((prev) => ({
         ...prev,
-        [selectedAgentId]: (matchData.matches || []).filter(
+        [selectedAgentId]: newMatches.filter(
           (m: EnrichedMatch) => m.status === 'potential'
         ).length,
       }));
@@ -133,6 +244,27 @@ export default function BuyAgentsPage() {
       console.error('Finder run failed:', err);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const handleStatusChange = async (agentId: string, newStatus: BuyAgentStatus) => {
+    // Optimistic update
+    setBuyAgents(
+      buyAgents.map(a => a.id === agentId ? { ...a, status: newStatus } : a)
+    );
+
+    try {
+      await fetch('/api/buy-agents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agentId, status: newStatus }),
+      });
+    } catch (err) {
+      console.error('Failed to update agent status:', err);
+      // Revert on failure
+      const res = await fetch('/api/buy-agents');
+      const data = await res.json();
+      if (data.agents) setBuyAgents(data.agents);
     }
   };
 
@@ -196,6 +328,8 @@ export default function BuyAgentsPage() {
   const potentialMatches = matches.filter((m) => m.status === 'potential');
   const otherMatches = matches.filter((m) => m.status !== 'potential');
 
+  const activeAgentCount = buyAgents.filter(a => (a.status || 'active') === 'active').length;
+
   if (loading) {
     return (
       <MainLayout>
@@ -213,7 +347,7 @@ export default function BuyAgentsPage() {
           <div>
             <h1 className="font-heading text-2xl font-light tracking-tight">My Buy Agents</h1>
             <p className="text-sm text-bp-muted mt-0.5">
-              {buyAgents.length} agent{buyAgents.length !== 1 ? 's' : ''} active
+              {activeAgentCount} active, {buyAgents.length - activeAgentCount} inactive
             </p>
           </div>
           <Link href="/buy/new">
@@ -231,6 +365,7 @@ export default function BuyAgentsPage() {
                   agent={agent}
                   matchCount={matchCounts[agent.id] || 0}
                   onClick={() => handleSelectAgent(agent.id)}
+                  onStatusChange={handleStatusChange}
                   selected={selectedAgentId === agent.id}
                 />
               </div>
@@ -253,39 +388,47 @@ export default function BuyAgentsPage() {
             {selectedAgentId ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-heading text-lg font-medium">
-                    Potential Matches
-                    {potentialMatches.length > 0 && (
-                      <span className="text-bp-muted font-normal ml-2 text-sm">
-                        ({potentialMatches.length})
-                      </span>
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-heading text-lg font-medium">
+                      Potential Matches
+                      {potentialMatches.length > 0 && (
+                        <span className="text-bp-muted font-normal ml-2 text-sm">
+                          ({potentialMatches.length})
+                        </span>
+                      )}
+                    </h2>
+                    {autoSearching && (
+                      <div className="flex items-center gap-1.5 text-bp-buyer">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="text-[11px] font-medium">Auto-searching...</span>
+                      </div>
                     )}
-                  </h2>
+                  </div>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={handleRunFinder}
                     loading={running}
-                    disabled={running}
+                    disabled={running || autoSearching}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${running ? 'animate-spin' : ''}`} />
                     {running ? 'Searching...' : 'Run Finder'}
                   </Button>
                 </div>
 
-                {matchesLoading && (
+                {matchesLoading && !autoSearching && (
                   <Card className="text-center py-12">
                     <Loader2 className="w-6 h-6 text-bp-buyer animate-spin mx-auto mb-3" />
                     <p className="text-sm text-bp-muted">Loading matches...</p>
                   </Card>
                 )}
 
-                {potentialMatches.length === 0 && !running && !matchesLoading && (
+                {potentialMatches.length === 0 && !running && !matchesLoading && !autoSearching && (
                   <Card className="text-center py-12">
                     <Inbox className="w-8 h-8 text-bp-muted-light mx-auto mb-3" />
                     <p className="text-sm text-bp-muted">No potential matches yet</p>
                     <p className="text-xs text-bp-muted-light mt-1">
-                      Click &quot;Run Finder&quot; to search for listings
+                      The finder runs automatically, or click &quot;Run Finder&quot; to search now
                     </p>
                   </Card>
                 )}

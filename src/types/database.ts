@@ -41,6 +41,8 @@ export interface SellAgent {
   created_at: string;
 }
 
+export type BuyAgentStatus = 'active' | 'paused' | 'stopped';
+
 export interface BuyAgent {
   id: string;
   user_id: string;
@@ -50,6 +52,7 @@ export interface BuyAgent {
   prompt: string;
   max_price: number;
   urgency: 'low' | 'medium' | 'high';
+  status: BuyAgentStatus;
   created_at: string;
 }
 
