@@ -92,7 +92,7 @@ export function EventCard({ event, compact = false, showThumbnail = false }: Eve
             <Badge variant={config.variant}>{config.label}</Badge>
             <span className="text-[11px] text-bp-muted-light">{formatRelativeTime(event.created_at)}</span>
           </div>
-          {title && <h4 className="text-sm font-medium truncate">{title}</h4>}
+          {title && <h4 className="text-sm truncate">{title}</h4>}
           {message && <p className="text-xs text-bp-muted mt-0.5 line-clamp-2">{message}</p>}
           {price !== null && (
             <p className="text-sm font-medium mt-1">{formatPrice(price)}</p>

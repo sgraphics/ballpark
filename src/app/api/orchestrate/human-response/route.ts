@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { pushUpdate } from '@/lib/sse';
 import type { Negotiation, NegMessage, ParsedMessage } from '@/types/database';
 
 export async function POST(req: NextRequest) {
@@ -32,9 +33,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Determine the correct target from the last message's user_prompt
+    const lastMsgResult = await query<NegMessage>(
+      `SELECT * FROM messages WHERE negotiation_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [negotiation_id]
+    );
+    const lastMsg = lastMsgResult.rows[0];
+    const promptTarget = lastMsg?.parsed?.user_prompt?.target;
+
+    // Enforce: human response must match the prompt target
+    // If the client sent a mismatched target, override with the correct one from the prompt
+    const resolvedTarget = promptTarget || target || 'buyer';
+
+    if (target && promptTarget && target !== promptTarget) {
+      console.warn(`[human-response] Target mismatch: client sent "${target}" but prompt targets "${promptTarget}". Using "${promptTarget}".`);
+    }
+
     const parsed: ParsedMessage = {
       answer: response,
-      status_message: `Human (${target || 'user'}) responded`,
+      status_message: `Human (${resolvedTarget}) responded`,
       price_proposal: null,
       concessions: [],
       user_prompt: null,
@@ -46,11 +63,42 @@ export async function POST(req: NextRequest) {
       [negotiation_id, response, JSON.stringify(parsed)]
     );
 
-    const newBall = target === 'seller' ? 'seller' : 'buyer';
+    // Route the ball to the agent that asked the question
+    // If a buyer_agent asked -> ball goes to buyer (so buyer_agent continues)
+    // If a seller_agent asked -> ball goes to seller (so seller_agent continues)
+    const lastAgentRole = lastMsg?.role;
+    let newBall: 'buyer' | 'seller';
+    if (lastAgentRole === 'seller_agent') {
+      newBall = 'seller';
+    } else if (lastAgentRole === 'buyer_agent') {
+      newBall = 'buyer';
+    } else {
+      // Fallback: route based on resolved target
+      newBall = resolvedTarget === 'seller' ? 'seller' : 'buyer';
+    }
+
     await query(
       `UPDATE negotiations SET ball = $1, updated_at = NOW() WHERE id = $2`,
       [newBall, negotiation_id]
     );
+
+    // Push SSE update
+    pushUpdate(negotiation_id, {
+      type: 'update',
+      negotiation: {
+        id: negotiation_id,
+        state: negotiation.state,
+        ball: newBall,
+      },
+      message: {
+        id: `human-${Date.now()}`,
+        negotiation_id,
+        role: 'human',
+        raw: response,
+        parsed,
+        created_at: new Date().toISOString(),
+      },
+    });
 
     if (auto_continue) {
       try {

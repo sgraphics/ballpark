@@ -95,7 +95,7 @@ function NegotiationCard({ negotiation }: { negotiation: EnrichedNegotiation }) 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-heading text-sm font-medium truncate">
+                <h3 className="font-heading text-sm truncate">
                   {negotiation.listing_title || 'Unknown Listing'}
                 </h3>
                 <p className="text-xs text-bp-muted mt-0.5">
@@ -188,7 +188,7 @@ export default function ArenaPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="font-heading text-2xl font-light tracking-tight">Duel Arena</h1>
+            <h1 className="font-heading text-2xl tracking-tight">Duel Arena</h1>
             <p className="text-sm text-bp-muted mt-0.5">
               {activeNegotiations.length} active negotiation{activeNegotiations.length !== 1 ? 's' : ''}
             </p>
@@ -204,7 +204,7 @@ export default function ArenaPage() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="w-4 h-4 text-bp-warning" />
-              <h2 className="font-heading text-sm font-medium">Needs Your Input</h2>
+              <h2 className="font-heading text-sm">Needs Your Input</h2>
               <Badge className="bg-bp-warning-soft text-bp-warning">{needsAttention.length}</Badge>
             </div>
             <div className="space-y-3">
@@ -217,7 +217,7 @@ export default function ArenaPage() {
 
         {activeNegotiations.filter(n => n.ball !== 'human').length > 0 && (
           <div className="mb-6">
-            <h2 className="font-heading text-sm font-medium mb-3">Active Negotiations</h2>
+            <h2 className="font-heading text-sm mb-3">Active Negotiations</h2>
             <div className="space-y-3">
               {activeNegotiations
                 .filter(n => n.ball !== 'human')
@@ -231,7 +231,7 @@ export default function ArenaPage() {
         {activeNegotiations.length === 0 && !loading && (
           <Card className="text-center py-16">
             <Swords className="w-12 h-12 text-bp-muted-light mx-auto mb-4" />
-            <h3 className="font-heading text-lg font-medium mb-2">No Active Negotiations</h3>
+            <h3 className="font-heading text-lg mb-2">No Active Negotiations</h3>
             <p className="text-sm text-bp-muted mb-4">
               Start a negotiation from your buy agents&apos; matches
             </p>
@@ -245,7 +245,7 @@ export default function ArenaPage() {
 
         {completedNegotiations.length > 0 && (
           <div className="mt-8">
-            <h2 className="font-heading text-sm font-medium text-bp-muted mb-3">
+            <h2 className="font-heading text-sm text-bp-muted mb-3">
               Completed ({completedNegotiations.length})
             </h2>
             <div className="space-y-2 opacity-60">

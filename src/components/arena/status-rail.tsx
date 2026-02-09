@@ -156,7 +156,7 @@ function HeroThumbnail({ listing }: { listing: Listing }) {
 
         {/* Listing info */}
         <div className="flex-1 min-w-0">
-          <h4 className="font-heading text-sm font-medium text-bp-black truncate">
+          <h4 className="font-heading text-sm text-bp-black truncate">
             {listing.title}
           </h4>
           <div className="flex items-center gap-2 mt-0.5">
@@ -184,7 +184,7 @@ export function StatusRail({ messages, listing, className = '' }: StatusRailProp
   if (messages.length === 0) {
     return (
       <Card className={`p-4 ${className}`}>
-        <h3 className="font-heading text-sm font-medium mb-3">Status Rail</h3>
+        <h3 className="font-heading text-sm mb-3">Status Rail</h3>
         {listing && <HeroThumbnail listing={listing} />}
         <div className="text-center py-8">
           <Bot className="w-8 h-8 text-bp-muted-light mx-auto mb-2" />
@@ -199,7 +199,7 @@ export function StatusRail({ messages, listing, className = '' }: StatusRailProp
 
   return (
     <Card className={`p-4 ${className}`}>
-      <h3 className="font-heading text-sm font-medium mb-3">
+      <h3 className="font-heading text-sm mb-3">
         Status Rail
         <span className="text-bp-muted font-normal ml-2">({messages.length})</span>
       </h3>

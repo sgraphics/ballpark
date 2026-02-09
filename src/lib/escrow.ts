@@ -1,11 +1,23 @@
 import { ethers, Contract, BrowserProvider, JsonRpcSigner } from 'ethers';
 
+// USDC has 6 decimals
+const USDC_DECIMALS = 6;
+
+const ERC20_ABI = [
+  'function approve(address spender, uint256 amount) external returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+  'function symbol() view returns (string)',
+  'function transfer(address to, uint256 amount) external returns (bool)',
+];
+
 const DEFAULT_ABI = [
   'function create(bytes32 itemId, uint256 price, address buyer) external',
-  'function deposit() external payable',
-  'function confirm() external',
-  'function flag() external',
-  'function updatePrice(uint256 newPrice) external',
+  'function deposit(bytes32 itemId) external',
+  'function confirm(bytes32 itemId) external',
+  'function flag(bytes32 itemId) external',
+  'function updatePrice(bytes32 itemId, uint256 newPrice) external',
   'function getEscrow(bytes32 itemId) view returns (address seller, address buyer, uint256 price, uint8 status)',
   'event EscrowCreated(bytes32 indexed itemId, address seller, address buyer, uint256 price)',
   'event Deposited(bytes32 indexed itemId, uint256 amount)',
@@ -90,52 +102,60 @@ export async function createEscrow(
   return receipt.hash;
 }
 
+/**
+ * Deposit USDC to escrow. Caller must have already approved the escrow
+ * contract to spend the required USDC amount via approveUSDC().
+ */
 export async function depositToEscrow(
   signer: JsonRpcSigner,
   listingId: string,
-  amountWei: bigint
+  _amountUSDC: bigint
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const tx = await contract.deposit({ value: amountWei });
+  const itemId = listingIdToBytes32(listingId);
+  const tx = await contract.deposit(itemId);
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
 export async function confirmDelivery(
   signer: JsonRpcSigner,
-  _listingId: string
+  listingId: string
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const tx = await contract.confirm();
+  const itemId = listingIdToBytes32(listingId);
+  const tx = await contract.confirm(itemId);
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
 export async function flagIssue(
   signer: JsonRpcSigner,
-  _listingId: string
+  listingId: string
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const tx = await contract.flag();
+  const itemId = listingIdToBytes32(listingId);
+  const tx = await contract.flag(itemId);
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
 export async function updatePrice(
   signer: JsonRpcSigner,
-  _listingId: string,
+  listingId: string,
   newPriceWei: bigint
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const tx = await contract.updatePrice(newPriceWei);
+  const itemId = listingIdToBytes32(listingId);
+  const tx = await contract.updatePrice(itemId, newPriceWei);
   const receipt = await tx.wait();
   return receipt.hash;
 }
@@ -167,6 +187,81 @@ export function formatEther(wei: bigint): string {
 
 export function parseEther(ether: string): bigint {
   return ethers.parseEther(ether);
+}
+
+// ── USDC helpers ────────────────────────────────────────────
+
+/** Convert a human-readable USDC amount (e.g. "150.50") to its 6-decimal on-chain representation. */
+export function parseUSDC(amount: string | number): bigint {
+  const str = typeof amount === 'number' ? amount.toFixed(USDC_DECIMALS) : amount;
+  return ethers.parseUnits(str, USDC_DECIMALS);
+}
+
+/** Convert an on-chain USDC amount (6 decimals) back to a human-readable string. */
+export function formatUSDC(raw: bigint): string {
+  return ethers.formatUnits(raw, USDC_DECIMALS);
+}
+
+/** Format a USDC amount for display with $ sign and 2 decimal places. */
+export function displayUSDC(raw: bigint): string {
+  const num = parseFloat(ethers.formatUnits(raw, USDC_DECIMALS));
+  return `$${num.toFixed(2)} USDC`;
+}
+
+/** Get the configured USDC token contract address. */
+export function getUSDCAddress(): string | null {
+  return process.env.NEXT_PUBLIC_USDC_CONTRACT_ADDRESS ||
+    process.env.USDC_CONTRACT_ADDRESS ||
+    null;
+}
+
+/** Create an ERC-20 contract instance for USDC. */
+export function createUSDCContract(
+  signerOrProvider: JsonRpcSigner | ethers.Provider
+): Contract | null {
+  const address = getUSDCAddress();
+  if (!address) return null;
+  return new Contract(address, ERC20_ABI, signerOrProvider);
+}
+
+/** Approve the escrow contract to spend USDC on behalf of the signer. */
+export async function approveUSDC(
+  signer: JsonRpcSigner,
+  amount: bigint
+): Promise<string> {
+  const usdc = createUSDCContract(signer);
+  if (!usdc) throw new Error('USDC contract address not configured');
+
+  const config = getEscrowConfig();
+  if (!config) throw new Error('Escrow contract not configured');
+
+  const tx = await usdc.approve(config.contractAddress, amount);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+/** Check USDC allowance for the escrow contract. */
+export async function getUSDCAllowance(
+  provider: ethers.Provider,
+  ownerAddress: string
+): Promise<bigint> {
+  const usdc = createUSDCContract(provider);
+  if (!usdc) return BigInt(0);
+
+  const config = getEscrowConfig();
+  if (!config) return BigInt(0);
+
+  return await usdc.allowance(ownerAddress, config.contractAddress);
+}
+
+/** Check USDC balance for an address. */
+export async function getUSDCBalance(
+  provider: ethers.Provider,
+  address: string
+): Promise<bigint> {
+  const usdc = createUSDCContract(provider);
+  if (!usdc) return BigInt(0);
+  return await usdc.balanceOf(address);
 }
 
 export async function getSignerFromPrivy(

@@ -40,7 +40,7 @@ export function BuyAgentForm({ formData, onChange }: BuyAgentFormProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-heading text-base font-medium mb-4">Agent Identity</h3>
+        <h3 className="font-heading text-base mb-4">Agent Identity</h3>
         <div className="space-y-4">
           <Input
             label="Agent Name"
@@ -52,7 +52,7 @@ export function BuyAgentForm({ formData, onChange }: BuyAgentFormProps) {
       </div>
 
       <div>
-        <h3 className="font-heading text-base font-medium mb-4">What are you looking for?</h3>
+        <h3 className="font-heading text-base mb-4">What are you looking for?</h3>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select
@@ -79,7 +79,7 @@ export function BuyAgentForm({ formData, onChange }: BuyAgentFormProps) {
 
       {fields.length > 0 && (
         <div>
-          <h3 className="font-heading text-base font-medium mb-2">Category Filters</h3>
+          <h3 className="font-heading text-base mb-2">Category Filters</h3>
           <p className="text-xs text-bp-muted mb-4">
             Set preferences for each field. Leave blank for no preference.
           </p>
@@ -112,7 +112,7 @@ export function BuyAgentForm({ formData, onChange }: BuyAgentFormProps) {
       )}
 
       <div>
-        <h3 className="font-heading text-base font-medium mb-4">Preferences</h3>
+        <h3 className="font-heading text-base mb-4">Preferences</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-bp-muted mb-1 font-body">

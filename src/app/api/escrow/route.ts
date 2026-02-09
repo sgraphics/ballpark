@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { pushUpdate } from '@/lib/sse';
 import type { Escrow, Negotiation } from '@/types/database';
 
 export async function GET(req: NextRequest) {
@@ -33,10 +34,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * POST: Seller creates the escrow (provides buyer wallet and agreed USDC price).
+ * Transitions: negotiation state -> escrow_created, ball -> buyer
+ */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { negotiation_id, item_id, tx_create } = body;
+    const { negotiation_id, item_id, buyer_wallet, seller_wallet, usdc_amount, tx_create } = body;
 
     if (!negotiation_id || !item_id) {
       return NextResponse.json(
@@ -45,18 +50,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate negotiation is in agreed state
+    const negResult = await query<Negotiation>(
+      'SELECT * FROM negotiations WHERE id = $1',
+      [negotiation_id]
+    );
+    if (negResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Negotiation not found' }, { status: 404 });
+    }
+    const negotiation = negResult.rows[0];
+
+    if (negotiation.state !== 'agreed') {
+      return NextResponse.json(
+        { error: `Cannot create escrow: negotiation state is "${negotiation.state}", expected "agreed"` },
+        { status: 400 }
+      );
+    }
+
     const contractAddress = process.env.ESCROW_CONTRACT_ADDRESS ||
       process.env.NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS || '';
 
     const result = await query<Escrow>(
-      `INSERT INTO escrow (negotiation_id, contract_address, item_id, tx_create)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO escrow (negotiation_id, contract_address, item_id, buyer_wallet, seller_wallet, usdc_amount, tx_create)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [negotiation_id, contractAddress, item_id, tx_create || null]
+      [negotiation_id, contractAddress, item_id, buyer_wallet || null, seller_wallet || null, usdc_amount || negotiation.agreed_price, tx_create || null]
     );
 
+    // Transition: state -> escrow_created, ball -> buyer (buyer must pay)
     await query<Negotiation>(
-      `UPDATE negotiations SET state = 'escrow_created', updated_at = NOW() WHERE id = $1`,
+      `UPDATE negotiations SET state = 'escrow_created', ball = 'buyer', updated_at = NOW() WHERE id = $1`,
       [negotiation_id]
     );
 
@@ -67,10 +90,25 @@ export async function POST(req: NextRequest) {
         JSON.stringify({
           negotiation_id,
           item_id,
+          buyer_wallet,
+          seller_wallet,
+          usdc_amount: usdc_amount || negotiation.agreed_price,
           tx_hash: tx_create,
+          ball: 'buyer',
         }),
       ]
     );
+
+    // Push SSE: buyer now needs to deposit
+    pushUpdate(negotiation_id, {
+      type: 'update',
+      negotiation: {
+        id: negotiation_id,
+        state: 'escrow_created',
+        ball: 'buyer',
+        agreed_price: negotiation.agreed_price,
+      },
+    });
 
     return NextResponse.json({ escrow: result.rows[0] }, { status: 201 });
   } catch (err) {
@@ -79,6 +117,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * PATCH: State transitions within escrow.
+ * - deposit: buyer pays -> state=funded, ball stays buyer (buyer must confirm delivery later)
+ * - confirm: buyer confirms delivery -> state=confirmed, ball=seller (done)
+ * - flag:    buyer flags issue -> state=flagged
+ * - update_price: resolution -> state=resolved
+ */
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -138,6 +183,18 @@ export async function PATCH(req: NextRequest) {
       update_price: 'resolved',
     };
 
+    // Ball transitions:
+    // deposit: buyer paid, ball stays 'buyer' (buyer must later confirm delivery)
+    // confirm: buyer confirms delivery, ball -> 'seller' (seller receives funds, done)
+    // flag: buyer flags issue, ball -> 'human' (needs resolution)
+    // update_price: resolved, ball -> 'buyer' (may need new payment)
+    const ballMap: Record<string, string> = {
+      deposit: 'buyer',
+      confirm: 'seller',
+      flag: 'human',
+      update_price: 'buyer',
+    };
+
     const eventMap: Record<string, string> = {
       deposit: 'escrow_funded',
       confirm: 'delivery_confirmed',
@@ -146,8 +203,8 @@ export async function PATCH(req: NextRequest) {
     };
 
     await query<Negotiation>(
-      `UPDATE negotiations SET state = $1, updated_at = NOW() WHERE id = $2`,
-      [stateMap[action], escrow.negotiation_id]
+      `UPDATE negotiations SET state = $1, ball = $2, updated_at = NOW() WHERE id = $3`,
+      [stateMap[action], ballMap[action], escrow.negotiation_id]
     );
 
     await query(
@@ -158,9 +215,20 @@ export async function PATCH(req: NextRequest) {
           negotiation_id: escrow.negotiation_id,
           item_id: escrow.item_id,
           tx_hash,
+          ball: ballMap[action],
         }),
       ]
     );
+
+    // Push SSE update for the escrow state change
+    pushUpdate(escrow.negotiation_id, {
+      type: 'update',
+      negotiation: {
+        id: escrow.negotiation_id,
+        state: stateMap[action],
+        ball: ballMap[action],
+      },
+    });
 
     return NextResponse.json({ escrow: result.rows[0] });
   } catch (err) {

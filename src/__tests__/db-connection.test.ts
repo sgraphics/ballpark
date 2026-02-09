@@ -92,7 +92,7 @@ describe('Database Connection Integration', () => {
       'negotiations',
       'messages',
       'events',
-      'escrows'
+      'escrow'
     ];
 
     for (const table of expectedTables) {

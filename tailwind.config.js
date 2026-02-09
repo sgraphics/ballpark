@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['Poppins', 'sans-serif'],
+        heading: ['Montserrat', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
       },
       colors: {

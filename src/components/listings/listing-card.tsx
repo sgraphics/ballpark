@@ -49,7 +49,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
         </div>
         <div className="p-3">
           <div className="flex items-start justify-between gap-2 mb-1.5">
-            <h3 className="text-sm font-medium truncate flex-1">{listing.title}</h3>
+            <h3 className="text-sm truncate flex-1">{listing.title}</h3>
             <span className="text-sm font-semibold whitespace-nowrap">{formatPrice(listing.ask_price)}</span>
           </div>
           {listing.description && (

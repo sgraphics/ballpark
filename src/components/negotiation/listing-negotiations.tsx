@@ -116,7 +116,7 @@ export function ListingNegotiations({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-bp-muted" />
-          <h3 className="font-heading text-sm font-medium">{title}</h3>
+          <h3 className="font-heading text-sm">{title}</h3>
           {activeNegotiations.length > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-cyan-500/10 text-cyan-600">
               {activeNegotiations.length}

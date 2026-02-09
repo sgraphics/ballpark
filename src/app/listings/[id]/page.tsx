@@ -139,7 +139,7 @@ export default function ListingDetailPage() {
             <Card>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h1 className="font-heading text-2xl font-medium">{listing.title}</h1>
+                  <h1 className="font-heading text-2xl">{listing.title}</h1>
                   <div className="flex items-center gap-2 mt-2">
                     {cat && (
                       <Badge variant="default">
@@ -175,7 +175,7 @@ export default function ListingDetailPage() {
 
           <div className="col-span-5 space-y-4">
             <Card>
-              <h3 className="font-heading text-sm font-medium mb-4 flex items-center gap-2">
+              <h3 className="font-heading text-sm mb-4 flex items-center gap-2">
                 <Shield className="w-4 h-4 text-bp-muted" />
                 Condition Notes
               </h3>
@@ -213,7 +213,7 @@ export default function ListingDetailPage() {
 
             {listing.haggling_ammo?.length > 0 && (
               <Card>
-                <h3 className="font-heading text-sm font-medium mb-4 flex items-center gap-2">
+                <h3 className="font-heading text-sm mb-4 flex items-center gap-2">
                   <Crosshair className="w-4 h-4 text-bp-muted" />
                   Haggling Ammo
                 </h3>

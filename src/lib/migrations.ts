@@ -241,6 +241,44 @@ const migrations: Migration[] = [
       END $$;
     `,
   },
+  {
+    id: '016',
+    name: 'rename_escrows_and_add_usdc_fields',
+    sql: `
+      DO $$
+      BEGIN
+        -- Rename table from 'escrows' to 'escrow' if needed (API uses singular)
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'escrows' AND table_schema = 'public')
+           AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'escrow' AND table_schema = 'public') THEN
+          ALTER TABLE escrows RENAME TO escrow;
+        END IF;
+
+        -- Add buyer_wallet column
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'escrow' AND column_name = 'buyer_wallet'
+        ) THEN
+          ALTER TABLE escrow ADD COLUMN buyer_wallet TEXT;
+        END IF;
+
+        -- Add usdc_amount column (stores amount in USDC decimal, e.g. 150.00)
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'escrow' AND column_name = 'usdc_amount'
+        ) THEN
+          ALTER TABLE escrow ADD COLUMN usdc_amount NUMERIC;
+        END IF;
+
+        -- Add seller_wallet column
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'escrow' AND column_name = 'seller_wallet'
+        ) THEN
+          ALTER TABLE escrow ADD COLUMN seller_wallet TEXT;
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 export async function runMigrations(): Promise<{ applied: string[]; skipped: string[] }> {

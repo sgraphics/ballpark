@@ -15,6 +15,7 @@ interface DuelArenaProps {
   negotiation: Negotiation;
   messages: NegMessage[];
   onRunStep?: () => void;
+  onInitiateEscrow?: () => void;
   isRunning?: boolean;
 }
 
@@ -326,21 +327,94 @@ function OfferLadder({ offers, agreedPrice }: { offers: OfferCard[]; agreedPrice
   );
 }
 
-function BallIndicator({ ball, state, onRunStep, isRunning }: {
+function BallIndicator({ ball, state, agreedPrice, onRunStep, onInitiateEscrow, isRunning }: {
   ball: BallOwner;
   state: Negotiation['state'];
+  agreedPrice?: number | null;
   onRunStep?: () => void;
+  onInitiateEscrow?: () => void;
   isRunning?: boolean;
 }) {
-  if (state === 'agreed') {
+  // Escrow states
+  if (state === 'escrow_created') {
+    return (
+      <div className="space-y-3">
+        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-cyan-500/10 rounded-xl border border-cyan-500/30 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.1)_0%,transparent_70%)]" />
+          <DollarSign className="w-6 h-6 text-cyan-400 animate-pulse relative z-10" />
+          <div className="relative z-10">
+            <span className="text-sm font-heading font-medium text-cyan-400 uppercase tracking-wider">Escrow Created</span>
+            <p className="text-[10px] text-cyan-500/70">Buyer: Approve & deposit USDC to proceed</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'funded') {
+    return (
+      <div className="space-y-3">
+        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
+          <Shield className="w-6 h-6 text-emerald-400 animate-pulse relative z-10" />
+          <div className="relative z-10">
+            <span className="text-sm font-heading font-medium text-emerald-400 uppercase tracking-wider">Escrow Funded</span>
+            <p className="text-[10px] text-emerald-500/70">Buyer: Confirm delivery to release funds</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'confirmed') {
     return (
       <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
         <Shield className="w-6 h-6 text-emerald-400 relative z-10" />
         <div className="relative z-10">
-          <span className="text-lg font-heading font-medium text-emerald-400">DEAL SECURED</span>
-          <p className="text-[10px] text-emerald-500/70 uppercase tracking-wider">Proceed to escrow</p>
+          <span className="text-lg font-heading font-medium text-emerald-400">TRANSACTION COMPLETE</span>
+          <p className="text-[10px] text-emerald-500/70 uppercase tracking-wider">Funds released to seller</p>
         </div>
+      </div>
+    );
+  }
+
+  if (state === 'flagged') {
+    return (
+      <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-red-500/10 rounded-xl border border-red-500/30 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.1)_0%,transparent_70%)]" />
+        <Shield className="w-6 h-6 text-red-400 relative z-10" />
+        <div className="relative z-10">
+          <span className="text-sm font-heading font-medium text-red-400 uppercase tracking-wider">Issue Flagged</span>
+          <p className="text-[10px] text-red-500/70">Awaiting resolution</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Deal agreed — seller can initiate escrow
+  if (state === 'agreed') {
+    return (
+      <div className="space-y-3">
+        <div className="relative flex items-center justify-center gap-3 py-4 px-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1)_0%,transparent_70%)]" />
+          <Shield className="w-6 h-6 text-emerald-400 relative z-10" />
+          <div className="relative z-10">
+            <span className="text-lg font-heading font-medium text-emerald-400">DEAL SECURED</span>
+            <p className="text-[10px] text-emerald-500/70 uppercase tracking-wider">
+              {agreedPrice ? `Agreed at $${agreedPrice} USDC` : 'Proceed to escrow'}
+            </p>
+          </div>
+        </div>
+        {onInitiateEscrow && (
+          <button
+            onClick={onInitiateEscrow}
+            className="relative w-full py-3.5 px-6 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-3 overflow-hidden bg-emerald-500 text-white hover:bg-emerald-400"
+          >
+            <Shield className="w-5 h-5" />
+            <span className="uppercase tracking-wider">Initiate Escrow</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -359,7 +433,6 @@ function BallIndicator({ ball, state, onRunStep, isRunning }: {
   }
 
   const isBuyer = ball === 'buyer';
-  const accentClass = isBuyer ? 'cyan' : 'orange';
 
   return (
     <div className="space-y-4">
@@ -427,6 +500,7 @@ export function DuelArena({
   negotiation,
   messages,
   onRunStep,
+  onInitiateEscrow,
   isRunning,
 }: DuelArenaProps) {
   const [mounted, setMounted] = useState(false);
@@ -490,7 +564,7 @@ export function DuelArena({
               <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <div>
-              <h2 className="font-heading text-lg text-white font-medium tracking-wide">DUEL ARENA</h2>
+              <h2 className="font-heading text-lg text-white tracking-wide">DUEL ARENA</h2>
               <p className="text-xs text-zinc-500">{listing.title}</p>
             </div>
           </div>
@@ -538,7 +612,7 @@ export function DuelArena({
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-zinc-600" />
-                  <h3 className="text-xs uppercase tracking-[0.2em] text-zinc-500 font-medium">Offer Ladder</h3>
+                  <h3 className="text-xs uppercase tracking-[0.2em] text-zinc-500">Offer Ladder</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -567,7 +641,9 @@ export function DuelArena({
                 <BallIndicator
                   ball={negotiation.ball}
                   state={negotiation.state}
-                  onRunStep={onRunStep}
+                  agreedPrice={negotiation.agreed_price}
+                  onRunStep={negotiation.state === 'negotiating' ? onRunStep : undefined}
+                  onInitiateEscrow={negotiation.state === 'agreed' ? onInitiateEscrow : undefined}
                   isRunning={isRunning}
                 />
               </div>

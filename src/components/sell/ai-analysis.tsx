@@ -23,7 +23,7 @@ export function AiAnalysis({ analysis, isDemo }: AiAnalysisProps) {
 
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-4 h-4 text-bp-seller" />
-        <h3 className="font-heading text-base font-medium">AI Analysis</h3>
+        <h3 className="font-heading text-base">AI Analysis</h3>
       </div>
 
       <Card>

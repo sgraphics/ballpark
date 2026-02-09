@@ -142,6 +142,9 @@ export interface Escrow {
   negotiation_id: string;
   contract_address: string;
   item_id: string;
+  buyer_wallet: string | null;
+  seller_wallet: string | null;
+  usdc_amount: number | null;
   tx_create: string | null;
   tx_deposit: string | null;
   tx_confirm: string | null;

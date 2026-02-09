@@ -72,7 +72,7 @@ export default function NewBuyAgentPage() {
           <div className="w-16 h-16 rounded-full bg-bp-buyer-soft flex items-center justify-center mx-auto mb-6">
             <Bot className="w-8 h-8 text-bp-buyer" />
           </div>
-          <h1 className="font-heading text-2xl font-light mb-2">Buy Agent Created</h1>
+          <h1 className="font-heading text-2xl mb-2">Buy Agent Created</h1>
           <p className="text-bp-muted text-sm mb-1">
             <span className="font-medium text-bp-black">{created.name}</span> is ready to find matches.
           </p>
@@ -106,7 +106,7 @@ export default function NewBuyAgentPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="font-heading text-2xl font-light tracking-tight">New Buy Agent</h1>
+            <h1 className="font-heading text-2xl tracking-tight">New Buy Agent</h1>
             <p className="text-sm text-bp-muted mt-0.5">
               Configure an AI agent to find and negotiate deals for you.
             </p>

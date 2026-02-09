@@ -26,7 +26,7 @@ export default function NewSellAgentPage() {
           <div className="w-16 h-16 rounded-full bg-bp-success-soft flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-bp-success" />
           </div>
-          <h1 className="font-heading text-2xl font-medium mb-2">Listing Created</h1>
+          <h1 className="font-heading text-2xl mb-2">Listing Created</h1>
           <p className="text-bp-muted mb-8">
             &ldquo;{listingTitle}&rdquo; is now live. Your sell agent is ready to negotiate.
           </p>
@@ -50,7 +50,7 @@ export default function NewSellAgentPage() {
       <MainLayout>
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <h1 className="font-heading text-2xl font-light tracking-tight">New Sell Agent</h1>
+            <h1 className="font-heading text-2xl tracking-tight">New Sell Agent</h1>
             <p className="text-sm text-bp-muted mt-0.5">
               Upload photos, get AI analysis, and create your listing with an automated sell agent.
             </p>

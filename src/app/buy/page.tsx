@@ -345,7 +345,7 @@ export default function BuyAgentsPage() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="font-heading text-2xl font-light tracking-tight">My Buy Agents</h1>
+            <h1 className="font-heading text-2xl tracking-tight">My Buy Agents</h1>
             <p className="text-sm text-bp-muted mt-0.5">
               {activeAgentCount} active, {buyAgents.length - activeAgentCount} inactive
             </p>
@@ -389,7 +389,7 @@ export default function BuyAgentsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h2 className="font-heading text-lg font-medium">
+                    <h2 className="font-heading text-lg">
                       Potential Matches
                       {potentialMatches.length > 0 && (
                         <span className="text-bp-muted font-normal ml-2 text-sm">
@@ -448,7 +448,7 @@ export default function BuyAgentsPage() {
 
                 {otherMatches.length > 0 && (
                   <>
-                    <h3 className="font-heading text-sm font-medium text-bp-muted mt-6">
+                    <h3 className="font-heading text-sm text-bp-muted mt-6">
                       Reviewed ({otherMatches.length})
                     </h3>
                     <div className="space-y-2">

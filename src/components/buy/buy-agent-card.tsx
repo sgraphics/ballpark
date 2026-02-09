@@ -57,7 +57,7 @@ export function BuyAgentCard({ agent, matchCount = 0, onClick, onStatusChange, s
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-heading text-sm font-medium truncate">{agent.name}</h3>
+              <h3 className="font-heading text-sm truncate">{agent.name}</h3>
               <StatusBadge status={status} />
             </div>
             <div className="flex items-center gap-2 mt-0.5">

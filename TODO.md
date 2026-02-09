@@ -432,6 +432,46 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 
 ---
 
+## MILESTONE 9.5: Agent Prompt Intelligence & Escrow Integration [DONE]
+**Status: COMPLETE**
+
+### 9.5.1 Smart Buyer Agent Prompts [DONE]
+- [x] Discovery phase (turns 1-3): buyer agent asks open questions to find hidden issues
+- [x] Negotiation phase (turns 4+): price proposals with mandatory reasoning
+- [x] Turn counter passed to prompt builders
+- [x] Buyer agent can only prompt buyer human (enforced in parseAgentResponse)
+
+### 9.5.2 Smart Seller Agent Prompts [DONE]
+- [x] Seller evaluates buyer reasoning: pushes back on trivial/visible issues
+- [x] Seller can only prompt seller human (enforced in parseAgentResponse)
+- [x] If no min_price set: seller agent asks human seller for minimum before countering
+- [x] If buyer offer < min_price: seller agent consults human seller for instructions
+
+### 9.5.3 Prompt Ownership Enforcement [DONE]
+- [x] parseAgentResponse overrides target to match agent role regardless of AI output
+- [x] human-response endpoint resolves target from last message's user_prompt
+- [x] human-response pushes SSE updates
+- [x] Ball routing: after human response, ball returns to the agent that asked
+
+### 9.5.4 Escrow Flow Integration [DONE]
+- [x] After deal agreed: ball goes to seller (seller must initiate escrow)
+- [x] "DEAL SECURED" now clickable — "Initiate Escrow" button
+- [x] Escrow API: POST creates escrow, transitions state to escrow_created, ball to buyer
+- [x] Escrow API: PATCH deposit/confirm/flag with ball transitions + SSE push
+- [x] BallIndicator shows actionable state prompts for each escrow phase
+- [x] Migration 016: rename escrows→escrow, add buyer_wallet, seller_wallet, usdc_amount
+
+### 9.5.5 USDC Token Integration [DONE]
+- [x] parseUSDC / formatUSDC / displayUSDC helpers (6 decimals)
+- [x] getUSDCAddress / createUSDCContract for ERC-20 interaction
+- [x] approveUSDC: approve escrow contract to spend buyer's USDC
+- [x] getUSDCAllowance / getUSDCBalance read helpers
+- [x] EscrowPanel: 2-step flow (Approve USDC → Deposit USDC)
+- [x] EscrowPanel: Confirm Delivery releases funds, Flag Issue for disputes
+- [x] Escrow contract ABI updated: deposit/confirm/flag/updatePrice take itemId param
+
+---
+
 ## MILESTONE 10: Seller Dashboard [TODO]
 **Status: NOT STARTED**
 **Priority: LOW**
@@ -456,8 +496,9 @@ Listing (1) <-- (N) Match (1) --> (0..1) Negotiation (1) <-- (N) NegMessage
 4. ~~**MILESTONE 7.3**: Stream status to feed (real-time feel)~~ **DONE**
 5. ~~**MILESTONE 8.1**: Listing page negotiation view~~ **DONE**
 6. ~~**MILESTONE 8.2**: Whose turn indicators~~ **DONE**
-7. **MILESTONE 9.1-9.2**: Buy agent auto-search
-8. **MILESTONE 8.3-8.4**: Polish (price animation, thumbnails)
-9. **MILESTONE 10**: Seller dashboard (nice to have)
+7. ~~**MILESTONE 9.1-9.2**: Buy agent auto-search~~ **DONE**
+8. ~~**MILESTONE 8.3-8.4**: Polish (price animation, thumbnails)~~ **DONE**
+9. ~~**MILESTONE 9.5**: Agent prompt intelligence & escrow integration~~ **DONE**
+10. **MILESTONE 10**: Seller dashboard (nice to have)
 
 ---

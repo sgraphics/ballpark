@@ -46,7 +46,7 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-heading text-base font-medium mb-4">Listing Details</h3>
+        <h3 className="font-heading text-base mb-4">Listing Details</h3>
         <div className="space-y-4">
           <Input
             label="Title"
@@ -91,7 +91,7 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
 
       {fields.length > 0 && (
         <div>
-          <h3 className="font-heading text-base font-medium mb-4">Category Details</h3>
+          <h3 className="font-heading text-base mb-4">Category Details</h3>
           <div className="grid grid-cols-2 gap-4">
             {fields.map((field) =>
               field.type === 'select' && field.options ? (
@@ -119,7 +119,7 @@ export function ConfirmForm({ analysis, formData, onChange }: ConfirmFormProps) 
       )}
 
       <div>
-        <h3 className="font-heading text-base font-medium mb-4">Sell Agent Settings</h3>
+        <h3 className="font-heading text-base mb-4">Sell Agent Settings</h3>
         <div className="space-y-4">
           <Input
             label="Agent Name"

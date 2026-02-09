@@ -257,7 +257,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         {step === 0 && (
           <div className="space-y-4">
             <div>
-              <h2 className="font-heading text-lg font-medium">Upload Product Photos</h2>
+              <h2 className="font-heading text-lg">Upload Product Photos</h2>
               <p className="text-sm text-bp-muted mt-0.5">
                 Add 3-6 clear photos from different angles. Our AI will analyze them for you.
               </p>
@@ -269,7 +269,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         {step === 1 && analysis && (
           <div className="space-y-4">
             <div>
-              <h2 className="font-heading text-lg font-medium">Review AI Analysis</h2>
+              <h2 className="font-heading text-lg">Review AI Analysis</h2>
               <p className="text-sm text-bp-muted mt-0.5">
                 Review what our AI detected. You will customize everything in the next step.
               </p>
@@ -281,7 +281,7 @@ export function CreateWizard({ onComplete }: CreateWizardProps) {
         {step === 2 && analysis && (
           <div className="space-y-4">
             <div>
-              <h2 className="font-heading text-lg font-medium">Confirm & Create Listing</h2>
+              <h2 className="font-heading text-lg">Confirm & Create Listing</h2>
               <p className="text-sm text-bp-muted mt-0.5">
                 Finalize your listing details and sell agent configuration.
               </p>

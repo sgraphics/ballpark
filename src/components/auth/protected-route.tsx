@@ -34,7 +34,7 @@ export function ProtectedRoute({ children, redirectTo = '/' }: ProtectedRoutePro
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h2 className="font-heading text-xl font-medium mb-2">Authentication Required</h2>
+          <h2 className="font-heading text-xl mb-2">Authentication Required</h2>
           <p className="text-sm text-bp-muted mb-4">Please sign in to continue</p>
           <button
             onClick={login}

@@ -9,7 +9,7 @@ export function CategoryFilter() {
 
   return (
     <div className="bg-white border border-bp-border rounded-xl p-4">
-      <h3 className="font-heading text-sm font-medium mb-3">Categories</h3>
+      <h3 className="font-heading text-sm mb-3">Categories</h3>
       <div className="space-y-0.5">
         <button
           onClick={() => setCategoryFilter('')}

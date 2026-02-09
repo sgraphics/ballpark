@@ -123,7 +123,7 @@ export default function AdminPage() {
       <MainLayout>
         <div className="max-w-md mx-auto text-center py-16">
           <Lock className="w-16 h-16 text-bp-muted-light mx-auto mb-4" />
-          <h1 className="font-heading text-2xl font-light mb-2">Access Denied</h1>
+          <h1 className="font-heading text-2xl mb-2">Access Denied</h1>
           <p className="text-bp-muted">
             This page is only accessible to administrators.
           </p>
@@ -141,7 +141,7 @@ export default function AdminPage() {
               <Shield className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h1 className="font-heading text-2xl font-light tracking-tight">Admin Panel</h1>
+              <h1 className="font-heading text-2xl tracking-tight">Admin Panel</h1>
               <p className="text-sm text-bp-muted">Manage flagged disputes</p>
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function AdminPage() {
         ) : flagged.length === 0 ? (
           <Card className="text-center py-16">
             <Check className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-            <h3 className="font-heading text-lg font-medium mb-2">No Flagged Disputes</h3>
+            <h3 className="font-heading text-lg mb-2">No Flagged Disputes</h3>
             <p className="text-sm text-bp-muted">All transactions are running smoothly</p>
           </Card>
         ) : (
@@ -171,7 +171,7 @@ export default function AdminPage() {
                       <AlertTriangle className="w-5 h-5 text-red-500" />
                     </div>
                     <div>
-                      <h3 className="font-heading text-sm font-medium">
+                      <h3 className="font-heading text-sm">
                         {listing?.title || 'Unknown Listing'}
                       </h3>
                       <p className="text-xs text-bp-muted">
