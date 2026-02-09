@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { PrivyProvider } from '@/providers/privy-provider';
+import { SuppressExtensionErrors } from '@/components/suppress-extension-errors';
 
 export const metadata: Metadata = {
   title: 'Ballpark - Agentic Marketplace',
@@ -11,6 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <SuppressExtensionErrors />
         <PrivyProvider>{children}</PrivyProvider>
       </body>
     </html>

@@ -78,11 +78,19 @@ function buildBuyerPrompt(ctx: OrchestrationContext): string {
   const { listing, buyAgent, messages } = ctx;
 
   const history = messages.map(m => {
+    const parsed = m.parsed || {} as ParsedMessage;
     const prefix = m.role === 'buyer_agent' ? 'YOU' :
                    m.role === 'seller_agent' ? 'SELLER' :
                    m.role === 'human' ? 'YOUR BUYER' : 'SYSTEM';
-    return `${prefix}: ${m.parsed.answer || m.raw}${m.parsed.price_proposal ? ` [Proposed: $${m.parsed.price_proposal}]` : ''}`;
+    return `${prefix}: ${parsed.answer || m.raw}${parsed.price_proposal ? ` [Proposed: $${parsed.price_proposal}]` : ''}`;
   }).join('\n');
+
+  const conditionNotes = Array.isArray(listing.condition_notes)
+    ? listing.condition_notes.map(n => `${n.issue} (${n.confidence} confidence)`).join('; ')
+    : '';
+  const hagglingAmmo = Array.isArray(listing.haggling_ammo)
+    ? listing.haggling_ammo.join('; ')
+    : '';
 
   return `${BUYER_SYSTEM_PROMPT
     .replace('{max_price}', `$${buyAgent.max_price}`)
@@ -94,9 +102,9 @@ LISTING:
 - Ask Price: $${listing.ask_price}
 - Category: ${listing.category}
 - Description: ${listing.description}
-- Condition Notes: ${listing.condition_notes.map(n => `${n.issue} (${n.confidence} confidence)`).join('; ') || 'None'}
-- Haggling Ammo: ${listing.haggling_ammo.join('; ') || 'None'}
-- Structured Data: ${JSON.stringify(listing.structured)}
+- Condition Notes: ${conditionNotes || 'None'}
+- Haggling Ammo: ${hagglingAmmo || 'None'}
+- Structured Data: ${JSON.stringify(listing.structured || {})}
 
 NEGOTIATION HISTORY:
 ${history || '(Starting negotiation)'}
@@ -111,11 +119,19 @@ function buildSellerPrompt(ctx: OrchestrationContext): string {
   const urgency = sellAgent?.urgency || 'medium';
 
   const history = messages.map(m => {
+    const parsed = m.parsed || {} as ParsedMessage;
     const prefix = m.role === 'seller_agent' ? 'YOU' :
                    m.role === 'buyer_agent' ? 'BUYER' :
                    m.role === 'human' ? 'YOUR SELLER' : 'SYSTEM';
-    return `${prefix}: ${m.parsed.answer || m.raw}${m.parsed.price_proposal ? ` [Proposed: $${m.parsed.price_proposal}]` : ''}`;
+    return `${prefix}: ${parsed.answer || m.raw}${parsed.price_proposal ? ` [Proposed: $${parsed.price_proposal}]` : ''}`;
   }).join('\n');
+
+  const conditionNotes = Array.isArray(listing.condition_notes)
+    ? listing.condition_notes.map(n => `${n.issue} (${n.confidence} confidence)`).join('; ')
+    : '';
+  const hagglingAmmo = Array.isArray(listing.haggling_ammo)
+    ? listing.haggling_ammo.join('; ')
+    : '';
 
   return `${SELLER_SYSTEM_PROMPT
     .replace('{ask_price}', `$${listing.ask_price}`)
@@ -127,9 +143,9 @@ LISTING:
 - Ask Price: $${listing.ask_price}
 - Category: ${listing.category}
 - Description: ${listing.description}
-- Condition Notes: ${listing.condition_notes.map(n => `${n.issue} (${n.confidence} confidence)`).join('; ') || 'None'}
-- Haggling Ammo: ${listing.haggling_ammo.join('; ') || 'None'}
-- Structured Data: ${JSON.stringify(listing.structured)}
+- Condition Notes: ${conditionNotes || 'None'}
+- Haggling Ammo: ${hagglingAmmo || 'None'}
+- Structured Data: ${JSON.stringify(listing.structured || {})}
 
 NEGOTIATION HISTORY:
 ${history || '(Starting negotiation)'}
@@ -178,17 +194,18 @@ function checkAgreement(
     (role === 'seller_agent' && m.role === 'buyer_agent')
   );
 
-  if (!lastOtherMessage?.parsed.price_proposal) {
+  const otherParsed = lastOtherMessage?.parsed || {} as ParsedMessage;
+  if (!otherParsed.price_proposal) {
     return { isAgreed: false, agreedPrice: null };
   }
 
   if (role === 'buyer_agent') {
-    if (newMessage.price_proposal >= lastOtherMessage.parsed.price_proposal) {
-      return { isAgreed: true, agreedPrice: lastOtherMessage.parsed.price_proposal };
+    if (newMessage.price_proposal >= otherParsed.price_proposal) {
+      return { isAgreed: true, agreedPrice: otherParsed.price_proposal };
     }
   } else {
-    if (newMessage.price_proposal <= lastOtherMessage.parsed.price_proposal) {
-      return { isAgreed: true, agreedPrice: lastOtherMessage.parsed.price_proposal };
+    if (newMessage.price_proposal <= otherParsed.price_proposal) {
+      return { isAgreed: true, agreedPrice: otherParsed.price_proposal };
     }
   }
 
@@ -211,7 +228,7 @@ export async function runOrchestrationStep(
     : buildSellerPrompt(ctx);
 
   const client = new GoogleGenerativeAI(apiKey);
-  const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
   const result = await model.generateContent(prompt);
   const raw = result.response.text();
@@ -245,7 +262,7 @@ export function generateDemoResponse(
     ctx.negotiation.ball === 'buyer' ? 'buyer_agent' : 'seller_agent';
 
   const lastPrice = [...ctx.messages].reverse()
-    .find(m => m.parsed.price_proposal !== null)?.parsed.price_proposal;
+    .find(m => (m.parsed || {}).price_proposal != null)?.parsed?.price_proposal ?? null;
 
   const askPrice = ctx.listing.ask_price;
   const maxPrice = ctx.buyAgent.max_price;

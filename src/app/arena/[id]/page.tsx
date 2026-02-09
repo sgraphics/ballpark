@@ -73,6 +73,7 @@ export default function ArenaPage({ params }: ArenaPageProps) {
     fetchData();
   }, [fetchData]);
 
+  // SSE for real-time updates
   useEffect(() => {
     const eventSource = new EventSource(`/api/negotiations/${params.id}/stream`);
 
@@ -83,9 +84,20 @@ export default function ArenaPage({ params }: ArenaPageProps) {
           setNegotiation(data.negotiation);
           setMessages(data.messages || []);
         } else if (data.type === 'update') {
-          if (data.negotiation) setNegotiation(data.negotiation);
+          if (data.negotiation) {
+            setNegotiation(prev => prev ? { ...prev, ...data.negotiation } : data.negotiation);
+          }
           if (data.message) {
-            setMessages(prev => [...prev, data.message]);
+            setMessages(prev => {
+              // Deduplicate by checking if we already have a message with same role+content
+              const dominated = prev.some(m =>
+                m.role === data.message.role &&
+                m.parsed?.price_proposal === data.message.parsed?.price_proposal &&
+                m.parsed?.status_message === data.message.parsed?.status_message
+              );
+              if (dominated) return prev;
+              return [...prev, data.message];
+            });
           }
         }
       } catch {
@@ -102,6 +114,32 @@ export default function ArenaPage({ params }: ArenaPageProps) {
     };
   }, [params.id]);
 
+  // Polling fallback: refresh negotiation state every 3s while negotiating
+  useEffect(() => {
+    if (!negotiation || negotiation.state === 'agreed' || negotiation.state === 'confirmed') return;
+
+    const poll = setInterval(async () => {
+      try {
+        const [negRes, msgRes] = await Promise.all([
+          fetch(`/api/negotiations?id=${params.id}`),
+          fetch(`/api/messages?negotiation_id=${params.id}`),
+        ]);
+        const [negData, msgData] = await Promise.all([negRes.json(), msgRes.json()]);
+
+        if (negData.negotiations?.[0]) {
+          setNegotiation(negData.negotiations[0]);
+        }
+        if (msgData.messages) {
+          setMessages(msgData.messages);
+        }
+      } catch {
+        // Silent - polling is best-effort
+      }
+    }, 3000);
+
+    return () => clearInterval(poll);
+  }, [params.id, negotiation?.state]);
+
   const handleRunStep = async () => {
     if (!negotiation) return;
     setRunning(true);
@@ -114,6 +152,11 @@ export default function ArenaPage({ params }: ArenaPageProps) {
       });
 
       const data = await res.json();
+
+      if (!res.ok) {
+        console.error(`[arena] Orchestration failed (${res.status}):`, data.error || data);
+        return;
+      }
 
       if (data.message) {
         setMessages(prev => [...prev, {

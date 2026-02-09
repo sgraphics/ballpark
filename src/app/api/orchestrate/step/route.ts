@@ -6,6 +6,7 @@ import {
   isGeminiConfigured,
   type OrchestrationContext,
 } from '@/lib/orchestrator';
+import { pushUpdate } from '@/lib/sse';
 import type { Listing, BuyAgent, SellAgent, Negotiation, NegMessage, NegotiationState } from '@/types/database';
 
 const processingNegotiations = new Set<string>();
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     processingNegotiations.add(negotiation_id);
+    console.log(`[orchestrate/step] Starting for negotiation ${negotiation_id}`);
 
     const negResult = await query<Negotiation>(
       'SELECT * FROM negotiations WHERE id = $1',
@@ -94,6 +96,8 @@ export async function POST(req: NextRequest) {
 
     const messages = messagesResult.rows;
 
+    console.log(`[orchestrate/step] Loaded context: listing=${listing.id}, buyAgent=${buyAgent.id}, sellAgent=${sellAgent?.id || 'none'}, messages=${messages.length}, ball=${negotiation.ball}`);
+
     const ctx: OrchestrationContext = {
       listing,
       buyAgent,
@@ -118,9 +122,14 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    const result = isGeminiConfigured()
+    const geminiReady = isGeminiConfigured();
+    console.log(`[orchestrate/step] Gemini configured: ${geminiReady}, calling ${geminiReady ? 'runOrchestrationStep' : 'generateDemoResponse'}...`);
+
+    const result = geminiReady
       ? await runOrchestrationStep(ctx)
       : generateDemoResponse(ctx);
+
+    console.log(`[orchestrate/step] Result: role=${result.role}, agreed=${result.isAgreed}, newBall=${result.newBall}, price=${result.parsed.price_proposal}`);
 
     await query<NegMessage>(
       `INSERT INTO messages (negotiation_id, role, raw, parsed)
@@ -163,6 +172,25 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    // Push real-time update to all connected SSE clients
+    pushUpdate(negotiation_id, {
+      type: 'update',
+      negotiation: {
+        id: negotiation_id,
+        state: newState,
+        ball: result.newBall,
+        agreed_price: result.agreedPrice,
+      },
+      message: {
+        id: `msg-${Date.now()}`,
+        negotiation_id,
+        role: result.role,
+        raw: result.raw,
+        parsed: result.parsed,
+        created_at: new Date().toISOString(),
+      },
+    });
+
     processingNegotiations.delete(negotiation_id);
 
     if (auto_continue && !result.isAgreed && result.newBall !== 'human') {
@@ -199,6 +227,10 @@ export async function POST(req: NextRequest) {
       processingNegotiations.delete(negotiationId);
     }
     const message = err instanceof Error ? err.message : 'Failed to run orchestration step';
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error('[orchestrate/step] ERROR:', message);
+    if (stack) console.error('[orchestrate/step] Stack:', stack);
+    console.error('[orchestrate/step] Full error:', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
