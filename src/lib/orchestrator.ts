@@ -320,7 +320,7 @@ export async function runOrchestrationStep(
     : buildSellerPrompt(ctx);
 
   const client = new GoogleGenerativeAI(apiKey);
-  const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
   const result = await model.generateContent(prompt);
   const raw = result.response.text();

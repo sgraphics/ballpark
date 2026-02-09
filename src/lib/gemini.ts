@@ -55,7 +55,7 @@ export async function analyzeImages(
   images: { data: string; mimeType: string }[]
 ): Promise<ImageAnalysisResult> {
   const client = getClient();
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
   const parts = [
     { text: ANALYSIS_PROMPT },
@@ -95,7 +95,7 @@ export async function generateHeroImage(
 ): Promise<HeroImageResult> {
   const client = getClient();
   const model = client.getGenerativeModel({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
   });
 
   const parts = [
