@@ -130,7 +130,7 @@ function getSslConfig(databaseUrl: string): any | undefined {
   if (!tlsEnabled) return undefined;
 
   // Check if user provided a CA file - this implies they want verification
-  const hasExplicitCA = !!(process.env.PGSSL_CA_FILE || process.env.PGSSL_CA_PEM);
+  const hasExplicitCA = !!(process.env.PGSSL_CA_FILE || process.env.PGSSL_CA_PEM || process.env.PGSSL_CA_BASE64);
 
   // Default verification behavior based on sslmode (libpq-compatible).
   // BUT: if user provides a CA, they likely want verification even with sslmode=require
@@ -151,11 +151,16 @@ function getSslConfig(databaseUrl: string): any | undefined {
     console.log('[db] TLS servername (SNI):', sslOptions.servername || '(none)');
     console.log('[db] PGSSL_CA_FILE set:', !!process.env.PGSSL_CA_FILE);
     console.log('[db] PGSSL_CA_PEM set:', !!process.env.PGSSL_CA_PEM);
+    console.log('[db] PGSSL_CA_BASE64 set:', !!process.env.PGSSL_CA_BASE64);
     console.log('[db] hasExplicitCA:', hasExplicitCA);
   }
 
   // Always load CA if provided (even for sslmode=require, the CA may be needed for custom certs)
-  const caPem = process.env.PGSSL_CA_PEM;
+  // Support base64-encoded CA cert (ideal for serverless envs where files aren't available)
+  const caBase64 = process.env.PGSSL_CA_BASE64;
+  const caPem = caBase64
+    ? Buffer.from(caBase64, 'base64').toString('utf8')
+    : process.env.PGSSL_CA_PEM;
   if (caPem) {
     sslOptions.ca = caPem;
     if (isDebugEnabled()) {
