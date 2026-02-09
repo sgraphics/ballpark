@@ -98,14 +98,18 @@ export function Header() {
       <div className="flex items-center gap-3 ml-auto">
         {!ready ? (
           <div className="px-3 py-1.5 text-xs text-bp-muted">Loading...</div>
-        ) : authenticated && walletAddress ? (
+        ) : authenticated ? (
           <div className="flex items-center gap-2">
-            {/* Wallet address - hidden on mobile */}
+            {/* Wallet address - hidden on mobile, shows loading while syncing */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-bp-border">
               <Wallet className="w-3.5 h-3.5 text-bp-muted" />
-              <span className="text-xs font-mono text-bp-muted">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </span>
+              {walletAddress ? (
+                <span className="text-xs font-mono text-bp-muted">
+                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </span>
+              ) : (
+                <span className="text-xs text-bp-muted">Syncing...</span>
+              )}
             </div>
             <Button variant="ghost" size="sm" onClick={logout}>
               <LogOut className="w-4 h-4" />
