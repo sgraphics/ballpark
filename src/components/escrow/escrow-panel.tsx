@@ -28,7 +28,6 @@ import {
   mockDeposit,
   mockConfirm,
   mockFlag,
-  parseEther,
 } from '@/lib/escrow';
 import type { Negotiation, Escrow } from '@/types/database';
 
@@ -82,17 +81,22 @@ export function EscrowPanel({
     try {
       let txHash = '';
 
+      let contractItemId = '';
+
       if (configured && privyProvider) {
         const signer = await getSignerFromPrivy(privyProvider);
         if (!signer) throw new Error('Could not get signer from wallet');
 
         const { createEscrow } = await import('@/lib/escrow');
         const priceOnChain = parseUSDC(agreedPrice);
-        txHash = await createEscrow(signer, listingId, priceOnChain, buyerAddress);
+        const result = await createEscrow(signer, negotiation.id, priceOnChain, buyerAddress);
+        txHash = result.txHash;
+        contractItemId = result.contractItemId;
       } else {
-        const result = await mockCreateEscrow(listingId, parseEther(agreedPrice.toString()), buyerAddress);
+        const result = await mockCreateEscrow(negotiation.id, parseUSDC(agreedPrice), buyerAddress);
         if (!result.success) throw new Error(result.error || 'Failed to create escrow');
         txHash = result.txHash;
+        contractItemId = result.contractItemId;
       }
 
       const res = await fetch('/api/escrow', {
@@ -100,7 +104,7 @@ export function EscrowPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           negotiation_id: negotiation.id,
-          item_id: listingId,
+          item_id: contractItemId,
           buyer_wallet: buyerAddress,
           seller_wallet: sellerAddress,
           usdc_amount: agreedPrice,
@@ -152,14 +156,15 @@ export function EscrowPanel({
     try {
       let txHash = '';
 
+      if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
+
       if (configured && privyProvider) {
         const signer = await getSignerFromPrivy(privyProvider);
         if (!signer) throw new Error('Could not get signer from wallet');
 
-        const amount = parseUSDC(usdcAmount);
-        txHash = await depositToEscrow(signer, listingId, amount);
+        txHash = await depositToEscrow(signer, escrow.item_id);
       } else {
-        const result = await mockDeposit(listingId, parseEther(usdcAmount.toString()));
+        const result = await mockDeposit(escrow.item_id);
         if (!result.success) throw new Error(result.error || 'Failed to deposit');
         txHash = result.txHash;
       }
@@ -192,12 +197,14 @@ export function EscrowPanel({
     try {
       let txHash = '';
 
+      if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
+
       if (configured && privyProvider) {
         const signer = await getSignerFromPrivy(privyProvider);
         if (!signer) throw new Error('Could not get signer from wallet');
-        txHash = await confirmDelivery(signer, listingId);
+        txHash = await confirmDelivery(signer, escrow.item_id);
       } else {
-        const result = await mockConfirm(listingId);
+        const result = await mockConfirm(escrow.item_id);
         if (!result.success) throw new Error(result.error || 'Failed to confirm');
         txHash = result.txHash;
       }
@@ -230,12 +237,14 @@ export function EscrowPanel({
     try {
       let txHash = '';
 
+      if (!escrow?.item_id) throw new Error('No contract item ID — escrow must be created first');
+
       if (configured && privyProvider) {
         const signer = await getSignerFromPrivy(privyProvider);
         if (!signer) throw new Error('Could not get signer from wallet');
-        txHash = await flagIssue(signer, listingId);
+        txHash = await flagIssue(signer, escrow.item_id);
       } else {
-        const result = await mockFlag(listingId);
+        const result = await mockFlag(escrow.item_id);
         if (!result.success) throw new Error(result.error || 'Failed to flag');
         txHash = result.txHash;
       }

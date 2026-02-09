@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice, formatRelativeTime } from '@/lib/utils';
-import { isEscrowConfigured, mockUpdatePrice, parseEther } from '@/lib/escrow';
+import { isEscrowConfigured, mockUpdatePrice, parseUSDC } from '@/lib/escrow';
 import type { Negotiation, Escrow, Listing } from '@/types/database';
 
 interface FlaggedNegotiation {
@@ -72,7 +72,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleUpdatePrice = async (negotiationId: string, listingId: string) => {
+  const handleUpdatePrice = async (negotiationId: string, contractItemId: string) => {
     const newPrice = parseFloat(newPrices[negotiationId] || '0');
     if (!newPrice || newPrice <= 0) {
       return;
@@ -81,12 +81,12 @@ export default function AdminPage() {
     setActionLoading(negotiationId);
 
     try {
-      const priceWei = parseEther(newPrice.toString());
+      const topay = parseUSDC(newPrice);
       const configured = isEscrowConfigured();
 
       const result = configured
         ? { success: true, txHash: 'pending-real-tx' }
-        : await mockUpdatePrice(listingId, priceWei);
+        : await mockUpdatePrice(contractItemId, topay);
 
       if (result.success) {
         await fetch('/api/escrow', {
@@ -231,7 +231,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => handleUpdatePrice(negotiation.id, negotiation.listing_id)}
+                    onClick={() => handleUpdatePrice(negotiation.id, escrow?.item_id || '')}
                     disabled={
                       actionLoading === negotiation.id ||
                       !newPrices[negotiation.id] ||

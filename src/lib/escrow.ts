@@ -12,42 +12,83 @@ const ERC20_ABI = [
   'function transfer(address to, uint256 amount) external returns (bool)',
 ];
 
-const DEFAULT_ABI = [
-  'function create(bytes32 itemId, uint256 price, address buyer) external',
-  'function deposit(bytes32 itemId) external',
-  'function confirm(bytes32 itemId) external',
-  'function flag(bytes32 itemId) external',
-  'function updatePrice(bytes32 itemId, uint256 newPrice) external',
-  'function getEscrow(bytes32 itemId) view returns (address seller, address buyer, uint256 price, uint8 status)',
-  'event EscrowCreated(bytes32 indexed itemId, address seller, address buyer, uint256 price)',
-  'event Deposited(bytes32 indexed itemId, uint256 amount)',
-  'event Confirmed(bytes32 indexed itemId)',
-  'event Flagged(bytes32 indexed itemId)',
-  'event PriceUpdated(bytes32 indexed itemId, uint256 oldPrice, uint256 newPrice)',
+/**
+ * Hardcoded ABI for the EscrowcontractWorkflow smart contract.
+ * Source: https://app.toolblox.net/summary/escrow_workflow_38b04850
+ *
+ * Key notes:
+ *  - `create` takes (price, buyer, externalId) where externalId is a bytes16 GUID
+ *    representing the negotiation ID. It returns a uint256 contract item ID.
+ *  - Subsequent operations (deposit, confirm, flag, updatePrice) use the uint256
+ *    contract item ID — NOT the negotiation UUID.
+ *  - Items can be looked up by externalId via getItemIdByExternalId / getItemByExternalId.
+ *
+ * On-chain statuses:
+ *   0 = Created  (owner: Seller)
+ *   1 = Deposited (owner: Buyer)
+ *   2 = Confirmed (owner: Buyer)
+ *   3 = Flagged   (owner: Buyer)
+ */
+const ESCROW_ABI = [
+  // State-changing functions
+  'function create(uint256 price, address buyer, bytes16 externalId) external returns (uint256)',
+  'function deposit(uint256 id) external returns (uint256)',
+  'function confirm(uint256 id) external returns (uint256)',
+  'function flag(uint256 id) external returns (uint256)',
+  'function updatePrice(uint256 id, uint256 topay) external returns (uint256)',
+
+  // View functions
+  'function getItem(uint256 id) view returns (tuple(uint256 id, uint64 status, uint256 price, address buyer, address seller, uint256 reimburse, bytes16 externalId, uint256 confirmationTime))',
+  'function getItemIdByExternalId(bytes16 externalId) view returns (uint256)',
+  'function getItemByExternalId(bytes16 externalId) view returns (tuple(uint256 id, uint64 status, uint256 price, address buyer, address seller, uint256 reimburse, bytes16 externalId, uint256 confirmationTime))',
+
+  // Events (ItemUpdated comes from WorkflowBase)
+  'event ItemUpdated(uint256 id, uint64 status)',
 ];
 
 export type EscrowStatus = 'none' | 'created' | 'funded' | 'confirmed' | 'flagged' | 'resolved';
 
 export interface EscrowInfo {
+  id: bigint;
   seller: string;
   buyer: string;
   price: bigint;
   status: EscrowStatus;
+  reimburse: bigint;
+  externalId: string;
+  confirmationTime: bigint;
 }
 
 export interface EscrowConfig {
   contractAddress: string;
-  abi?: string;
 }
 
+export interface CreateEscrowResult {
+  txHash: string;
+  /** The uint256 item ID assigned by the contract. Store this for subsequent operations. */
+  contractItemId: string;
+}
+
+/**
+ * Map on-chain status number to app status string.
+ * On-chain: 0=Created, 1=Deposited, 2=Confirmed, 3=Flagged
+ * Note: 'resolved' is an app-level status (after updatePrice) — on-chain it stays Flagged (3).
+ */
 function getStatusFromNumber(status: number): EscrowStatus {
-  const statuses: EscrowStatus[] = ['none', 'created', 'funded', 'confirmed', 'flagged', 'resolved'];
+  const statuses: EscrowStatus[] = ['created', 'funded', 'confirmed', 'flagged'];
   return statuses[status] || 'none';
 }
 
-function listingIdToBytes32(listingId: string): string {
-  const hex = listingId.replace(/-/g, '');
-  return '0x' + hex.padEnd(64, '0');
+/**
+ * Convert a negotiation UUID (e.g. "550e8400-e29b-41d4-a716-446655440000")
+ * to a bytes16 hex string for the contract's externalId field.
+ */
+function negotiationIdToBytes16(negotiationId: string): string {
+  const hex = negotiationId.replace(/-/g, '');
+  if (hex.length !== 32) {
+    throw new Error(`Invalid negotiation ID format: expected UUID (32 hex chars), got ${hex.length}`);
+  }
+  return '0x' + hex;
 }
 
 export function getEscrowConfig(): EscrowConfig | null {
@@ -58,13 +99,7 @@ export function getEscrowConfig(): EscrowConfig | null {
     return null;
   }
 
-  const abiJson = process.env.NEXT_PUBLIC_ESCROW_ABI_JSON ||
-    process.env.ESCROW_ABI_JSON;
-
-  return {
-    contractAddress,
-    abi: abiJson,
-  };
+  return { contractAddress };
 }
 
 export function isEscrowConfigured(): boolean {
@@ -77,104 +112,182 @@ export function createEscrowContract(
   const config = getEscrowConfig();
   if (!config) return null;
 
-  let abi: ethers.InterfaceAbi;
-  try {
-    abi = config.abi ? JSON.parse(config.abi) : DEFAULT_ABI;
-  } catch {
-    abi = DEFAULT_ABI;
-  }
-
-  return new Contract(config.contractAddress, abi, signerOrProvider);
+  return new Contract(config.contractAddress, ESCROW_ABI, signerOrProvider);
 }
 
+/**
+ * Seller creates an escrow on-chain.
+ *
+ * @param signer - Wallet signer (seller)
+ * @param negotiationId - The negotiation UUID, stored as externalId (bytes16) on-chain
+ * @param priceUSDC - Price in USDC on-chain units (6 decimals)
+ * @param buyerAddress - Buyer wallet address
+ * @returns txHash and the contract's auto-assigned uint256 item ID
+ */
 export async function createEscrow(
   signer: JsonRpcSigner,
-  listingId: string,
-  priceWei: bigint,
+  negotiationId: string,
+  priceUSDC: bigint,
   buyerAddress: string
+): Promise<CreateEscrowResult> {
+  const contract = createEscrowContract(signer);
+  if (!contract) throw new Error('Escrow contract not configured');
+
+  const externalId = negotiationIdToBytes16(negotiationId);
+  const tx = await contract.create(priceUSDC, buyerAddress, externalId);
+  const receipt = await tx.wait();
+
+  // Extract the contract item ID from the ItemUpdated event
+  let contractItemId = '0';
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log);
+      if (parsed?.name === 'ItemUpdated') {
+        contractItemId = parsed.args[0].toString();
+        break;
+      }
+    } catch {
+      // Not our event, skip
+    }
+  }
+
+  return { txHash: receipt.hash, contractItemId };
+}
+
+/**
+ * Buyer deposits USDC to escrow. Caller must have already approved the escrow
+ * contract to spend the required USDC amount via approveUSDC().
+ * The contract reads the price from storage — no amount parameter needed.
+ *
+ * @param contractItemId - The uint256 item ID from the contract (returned by createEscrow)
+ */
+export async function depositToEscrow(
+  signer: JsonRpcSigner,
+  contractItemId: string
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const itemId = listingIdToBytes32(listingId);
-  const tx = await contract.create(itemId, priceWei, buyerAddress);
+  const tx = await contract.deposit(BigInt(contractItemId));
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
 /**
- * Deposit USDC to escrow. Caller must have already approved the escrow
- * contract to spend the required USDC amount via approveUSDC().
+ * Buyer confirms delivery — releases funds to seller.
+ * Can also be called by anyone after the 14-day confirmation window expires.
+ *
+ * @param contractItemId - The uint256 item ID from the contract
  */
-export async function depositToEscrow(
-  signer: JsonRpcSigner,
-  listingId: string,
-  _amountUSDC: bigint
-): Promise<string> {
-  const contract = createEscrowContract(signer);
-  if (!contract) throw new Error('Escrow contract not configured');
-
-  const itemId = listingIdToBytes32(listingId);
-  const tx = await contract.deposit(itemId);
-  const receipt = await tx.wait();
-  return receipt.hash;
-}
-
 export async function confirmDelivery(
   signer: JsonRpcSigner,
-  listingId: string
+  contractItemId: string
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const itemId = listingIdToBytes32(listingId);
-  const tx = await contract.confirm(itemId);
+  const tx = await contract.confirm(BigInt(contractItemId));
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
+/**
+ * Buyer flags an issue with the escrow (moves from Deposited → Flagged).
+ *
+ * @param contractItemId - The uint256 item ID from the contract
+ */
 export async function flagIssue(
   signer: JsonRpcSigner,
-  listingId: string
+  contractItemId: string
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const itemId = listingIdToBytes32(listingId);
-  const tx = await contract.flag(itemId);
+  const tx = await contract.flag(BigInt(contractItemId));
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
+/**
+ * Platform resolves a flagged escrow by setting a new price (topay).
+ * Reimburse = original price - topay. After this, confirm() releases adjusted funds.
+ *
+ * @param contractItemId - The uint256 item ID from the contract
+ * @param topay - The new price the seller should receive (USDC on-chain units)
+ */
 export async function updatePrice(
   signer: JsonRpcSigner,
-  listingId: string,
-  newPriceWei: bigint
+  contractItemId: string,
+  topay: bigint
 ): Promise<string> {
   const contract = createEscrowContract(signer);
   if (!contract) throw new Error('Escrow contract not configured');
 
-  const itemId = listingIdToBytes32(listingId);
-  const tx = await contract.updatePrice(itemId, newPriceWei);
+  const tx = await contract.updatePrice(BigInt(contractItemId), topay);
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
+/**
+ * Look up escrow info by negotiation UUID (uses getItemByExternalId on-chain).
+ *
+ * @param negotiationId - The negotiation UUID used as externalId when creating
+ */
 export async function getEscrowInfo(
   provider: ethers.Provider,
-  listingId: string
+  negotiationId: string
 ): Promise<EscrowInfo | null> {
   const contract = createEscrowContract(provider);
   if (!contract) return null;
 
   try {
-    const itemId = listingIdToBytes32(listingId);
-    const result = await contract.getEscrow(itemId);
+    const externalId = negotiationIdToBytes16(negotiationId);
+    const result = await contract.getItemByExternalId(externalId);
+
+    // If id is 0, item doesn't exist
+    if (result.id === BigInt(0)) return null;
+
     return {
-      seller: result[0],
-      buyer: result[1],
-      price: result[2],
-      status: getStatusFromNumber(Number(result[3])),
+      id: result.id,
+      seller: result.seller,
+      buyer: result.buyer,
+      price: result.price,
+      status: getStatusFromNumber(Number(result.status)),
+      reimburse: result.reimburse,
+      externalId: result.externalId,
+      confirmationTime: result.confirmationTime,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up escrow info by contract item ID (uses getItem on-chain).
+ *
+ * @param contractItemId - The uint256 item ID from the contract
+ */
+export async function getEscrowInfoById(
+  provider: ethers.Provider,
+  contractItemId: string
+): Promise<EscrowInfo | null> {
+  const contract = createEscrowContract(provider);
+  if (!contract) return null;
+
+  try {
+    const result = await contract.getItem(BigInt(contractItemId));
+
+    if (result.id === BigInt(0)) return null;
+
+    return {
+      id: result.id,
+      seller: result.seller,
+      buyer: result.buyer,
+      price: result.price,
+      status: getStatusFromNumber(Number(result.status)),
+      reimburse: result.reimburse,
+      externalId: result.externalId,
+      confirmationTime: result.confirmationTime,
     };
   } catch {
     return null;
@@ -290,21 +403,25 @@ export function generateMockTxHash(): string {
   return hash;
 }
 
+function generateMockContractItemId(): string {
+  return Math.floor(Math.random() * 1000000 + 1).toString();
+}
+
 export async function mockCreateEscrow(
-  listingId: string,
-  priceWei: bigint,
-  buyerAddress: string
-): Promise<MockEscrowResult> {
+  _negotiationId: string,
+  _priceUSDC: bigint,
+  _buyerAddress: string
+): Promise<MockEscrowResult & { contractItemId: string }> {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {
     success: true,
     txHash: generateMockTxHash(),
+    contractItemId: generateMockContractItemId(),
   };
 }
 
 export async function mockDeposit(
-  listingId: string,
-  amountWei: bigint
+  _contractItemId: string
 ): Promise<MockEscrowResult> {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {
@@ -313,7 +430,7 @@ export async function mockDeposit(
   };
 }
 
-export async function mockConfirm(listingId: string): Promise<MockEscrowResult> {
+export async function mockConfirm(_contractItemId: string): Promise<MockEscrowResult> {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {
     success: true,
@@ -321,7 +438,7 @@ export async function mockConfirm(listingId: string): Promise<MockEscrowResult> 
   };
 }
 
-export async function mockFlag(listingId: string): Promise<MockEscrowResult> {
+export async function mockFlag(_contractItemId: string): Promise<MockEscrowResult> {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {
     success: true,
@@ -330,8 +447,8 @@ export async function mockFlag(listingId: string): Promise<MockEscrowResult> {
 }
 
 export async function mockUpdatePrice(
-  listingId: string,
-  newPriceWei: bigint
+  _contractItemId: string,
+  _topay: bigint
 ): Promise<MockEscrowResult> {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {

@@ -75,41 +75,39 @@ describe('Mock Transaction Hash', () => {
 });
 
 describe('Mock Escrow Operations', () => {
-  it('mockCreateEscrow returns success with tx hash', async () => {
+  it('mockCreateEscrow returns success with tx hash and contractItemId', async () => {
     const result = await mockCreateEscrow(
-      'listing-123',
-      BigInt('1000000000000000000'),
+      '550e8400-e29b-41d4-a716-446655440000',
+      BigInt('150000000'),
       '0xbuyer'
     );
     expect(result.success).toBe(true);
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(result.contractItemId).toBeTruthy();
   });
 
   it('mockDeposit returns success with tx hash', async () => {
-    const result = await mockDeposit(
-      'listing-123',
-      BigInt('1000000000000000000')
-    );
+    const result = await mockDeposit('42');
     expect(result.success).toBe(true);
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it('mockConfirm returns success with tx hash', async () => {
-    const result = await mockConfirm('listing-123');
+    const result = await mockConfirm('42');
     expect(result.success).toBe(true);
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it('mockFlag returns success with tx hash', async () => {
-    const result = await mockFlag('listing-123');
+    const result = await mockFlag('42');
     expect(result.success).toBe(true);
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it('mockUpdatePrice returns success with tx hash', async () => {
     const result = await mockUpdatePrice(
-      'listing-123',
-      BigInt('800000000000000000')
+      '42',
+      BigInt('120000000')
     );
     expect(result.success).toBe(true);
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -148,7 +146,7 @@ describe('Escrow Data Structures', () => {
       id: 'esc-1',
       negotiation_id: 'neg-1',
       contract_address: '0xcontract',
-      item_id: 'listing-1',
+      item_id: '42',
       tx_create: '0xtxcreate',
       tx_deposit: null,
       tx_confirm: null,
@@ -169,7 +167,7 @@ describe('Escrow Data Structures', () => {
       id: 'esc-1',
       negotiation_id: 'neg-1',
       contract_address: '0xcontract',
-      item_id: 'listing-1',
+      item_id: '42',
       tx_create: '0xtxcreate',
       tx_deposit: '0xtxdeposit',
       tx_confirm: '0xtxconfirm',
